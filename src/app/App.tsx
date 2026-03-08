@@ -101,7 +101,7 @@ export default function App() {
       if (event === 'SIGNED_IN' && session?.user) {
         setUser(session.user)
         determineAuthState(session.user)
-      } else if (event === 'SIGNED_OUT' || event === 'USER_DELETED') {
+      } else if (event === 'SIGNED_OUT' || (event as string) === 'USER_DELETED') {
         setUser(null)
         setAuthState('unauthenticated')
         resetAppState()
@@ -428,8 +428,12 @@ export default function App() {
   }
 
   // Auth handlers
-  const handleLogin = () => {
-    loadData()
+  const handleLogin = async () => {
+    const { data: { user } } = await supabase.auth.getUser()
+    if (user) {
+      setUser(user)
+      determineAuthState(user)
+    }
   }
 
   const handleLogout = async () => {
@@ -534,8 +538,8 @@ export default function App() {
       const project = projects.find(p => p.name === projectName)
       if (!project) return <div className="p-8 text-muted-foreground">Project not found</div>
 
-      const projectTasks = tasks.filter(t => t.project === project.name)
-      const projectResources = resources.filter(r => r.projectId === project.name || r.projectId === project.id)
+      const projectTasks = tasks.filter(t => t.project === project.id || t.project === project.name)
+      const projectResources = resources.filter(r => r.projectId === project.id || r.projectId === project.name)
 
       return (
         <ProjectDetails
@@ -545,12 +549,12 @@ export default function App() {
           statuses={statuses}
           resources={projectResources}
           onProjectUpdate={handleProjectUpdate}
-          onTaskCreate={(t) => handleTaskCreate({ ...t, project: project.name })}
+          onTaskCreate={(t) => handleTaskCreate({ ...t, project: project.id })}
           onTaskUpdate={handleTaskUpdate}
           onTaskDelete={handleTaskDelete}
           onTaskClick={handleTaskClick}
           onStatusesChange={setStatuses}
-          onResourceCreate={(r) => handleResourceCreate({ ...r, projectId: project.name })}
+          onResourceCreate={(r) => handleResourceCreate({ ...r, projectId: project.id })}
           onResourceUpdate={handleResourceUpdate}
           onResourceDelete={handleResourceDelete}
         />
