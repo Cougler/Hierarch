@@ -2,10 +2,10 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { AnimatePresence, motion } from 'motion/react'
 import { Toaster, toast } from 'sonner'
 import { supabase } from './supabase-client'
-import type { Task, Project, Resource, StatusConfig, TimeEntry, WaitingForItem } from './types'
+import type { Task, Project, Resource, StatusConfig, TimeEntry, WaitingForItem, PhaseTransition } from './types'
 import { DEFAULT_STATUSES } from './types'
 import * as api from './api/data'
-import { DEMO_USER, DEMO_PROJECTS, DEMO_TASKS, DEMO_RESOURCES, DEMO_TIME_ENTRIES } from './demo-data'
+import { DEMO_USER, DEMO_PROJECTS, DEMO_TASKS, DEMO_RESOURCES, DEMO_TIME_ENTRIES, DEMO_DESIGN_NOTES } from './demo-data'
 import { ThemeProvider } from './components/ThemeProvider'
 import { TooltipProvider } from './components/ui/tooltip'
 import { useIsMobile } from './hooks/use-mobile'
@@ -16,9 +16,10 @@ import Splash from './components/Splash'
 import Onboarding from './components/Onboarding'
 import AvatarSelection from './components/AvatarSelection'
 import { Sidebar } from './components/Sidebar'
-import { TodayOverview } from './components/TodayOverview'
+import { Briefing } from './components/Briefing'
 import { TaskBoard } from './components/TaskBoard'
 import { TaskDetailsDrawer } from './components/TaskDetailsDrawer'
+import { NewTaskDrawer } from './components/NewTaskDrawer'
 import { ProjectDetails } from './components/ProjectDetails'
 import { AttachmentsView } from './components/AttachmentsView'
 import { TimeTrackingView } from './components/TimeTrackingView'
@@ -30,8 +31,11 @@ import { UpdateNotification } from './components/UpdateNotification'
 import { CapacityView } from './components/CapacityView'
 import { FocusTimerView } from './components/FocusTimerView'
 import { LinearView } from './components/LinearView'
+import { FeedbackPrompt } from './components/FeedbackPrompt'
+import { NoteDrawer } from './components/NoteDrawer'
+import type { DesignNote } from './components/NoteDrawer'
 
-type AuthState = 'loading' | 'unauthenticated' | 'avatar' | 'onboarding' | 'authenticated'
+type AuthState = 'loading' | 'unauthenticated' | 'onboarding' | 'authenticated'
 type AuthView = 'login' | 'signup'
 
 export default function App() {
@@ -44,41 +48,77 @@ export default function App() {
   const [activeView, setActiveView] = useState('today')
   const [sidebarOpen, setSidebarOpen] = useState(false)
 
+  const [dataLoading, setDataLoading] = useState(true)
+
   const [projects, setProjects] = useState<Project[]>([])
   const [tasks, setTasks] = useState<Task[]>([])
   const [resources, setResources] = useState<Resource[]>([])
   const [timeEntries, setTimeEntries] = useState<TimeEntry[]>([])
   const [statuses, setStatuses] = useState<StatusConfig[]>(() => {
-    const saved = localStorage.getItem('flowki-statuses')
+    const saved = localStorage.getItem('hierarch-statuses')
     return saved ? JSON.parse(saved) : DEFAULT_STATUSES
   })
   const [showProjectIcons, setShowProjectIcons] = useState(() => {
-    return localStorage.getItem('flowki-show-project-icons') !== 'false'
+    return localStorage.getItem('hierarch-show-project-icons') !== 'false'
   })
 
   const [selectedTask, setSelectedTask] = useState<Task | null>(null)
   const [taskDrawerOpen, setTaskDrawerOpen] = useState(false)
+  const [newTaskDrawerOpen, setNewTaskDrawerOpen] = useState(false)
+  const [newTaskDefaultProjectId, setNewTaskDefaultProjectId] = useState<string | undefined>(undefined)
   const [showOnboarding, setShowOnboarding] = useState(false)
   const [demoMode, setDemoMode] = useState(false)
+  const [feedbackPrompt, setFeedbackPrompt] = useState<{ taskId: string; fromPhase: string } | null>(null)
+  const [focusTask, setFocusTask] = useState<Task | null>(null)
+
+  // Design notes
+  const [designNotes, setDesignNotes] = useState<DesignNote[]>(() => {
+    const saved = localStorage.getItem('hierarch-design-notes')
+    if (!saved) return []
+    // Migrate old notes format
+    const parsed = JSON.parse(saved)
+    return parsed.map((n: any) => ({
+      ...n,
+      title: n.title || '',
+      type: n.type || 'freeform',
+      updatedAt: n.updatedAt || n.timestamp,
+    }))
+  })
+  const [selectedNote, setSelectedNote] = useState<DesignNote | null>(null)
+  const [noteDrawerOpen, setNoteDrawerOpen] = useState(false)
 
   const tempIdMapping = useRef<Record<string, string>>({})
   const savingTaskIds = useRef<Set<string>>(new Set())
 
   const handleDemoLogin = () => {
     setDemoMode(true)
-    localStorage.setItem('flowki-demo', 'true')
+    localStorage.setItem('hierarch-demo', 'true')
     setUser(DEMO_USER)
     setProjects([...DEMO_PROJECTS])
     setTasks([...DEMO_TASKS])
     setResources([...DEMO_RESOURCES])
     setTimeEntries([...DEMO_TIME_ENTRIES])
+    setDesignNotes([...DEMO_DESIGN_NOTES])
+    setDataLoading(false)
+    setAuthState('onboarding')
+  }
+
+  const restoreDemoSession = () => {
+    setDemoMode(true)
+    setUser(DEMO_USER)
+    setProjects([...DEMO_PROJECTS])
+    setTasks([...DEMO_TASKS])
+    setResources([...DEMO_RESOURCES])
+    setTimeEntries([...DEMO_TIME_ENTRIES])
+    setDesignNotes([...DEMO_DESIGN_NOTES])
+    setDataLoading(false)
     setAuthState('authenticated')
   }
 
   // Auth initialization
   useEffect(() => {
-    if (localStorage.getItem('flowki-demo') === 'true') {
-      handleDemoLogin()
+    if (localStorage.getItem('hierarch-demo') === 'true') {
+      restoreDemoSession()
       return
     }
 
@@ -111,10 +151,15 @@ export default function App() {
     return () => subscription.unsubscribe()
   }, [])
 
-  const determineAuthState = (u: any) => {
+  const determineAuthState = async (u: any) => {
+    // Auto-skip avatar step: mark it seen immediately for all new users.
+    // Google users already have avatar_url set by Supabase; email users use initials.
     if (!u.user_metadata?.has_seen_avatar) {
-      setAuthState('avatar')
-    } else if (!u.user_metadata?.has_seen_onboarding) {
+      try {
+        await supabase.auth.updateUser({ data: { has_seen_avatar: true } })
+      } catch { /* best-effort */ }
+    }
+    if (!u.user_metadata?.has_seen_onboarding) {
       setAuthState('onboarding')
     } else {
       setAuthState('authenticated')
@@ -138,6 +183,8 @@ export default function App() {
   }, [authState])
 
   const loadData = async () => {
+    if (demoMode) { setDataLoading(false); return }
+    setDataLoading(true)
     const [projectsData, tasksData, resourcesData] = await Promise.all([
       api.getProjects(),
       api.getTasks(),
@@ -146,6 +193,7 @@ export default function App() {
     if (projectsData) setProjects(projectsData)
     if (tasksData) setTasks(tasksData)
     if (resourcesData) setResources(resourcesData)
+    setDataLoading(false)
     loadTimeEntries()
   }
 
@@ -169,11 +217,11 @@ export default function App() {
 
   // Persist statuses
   useEffect(() => {
-    localStorage.setItem('flowki-statuses', JSON.stringify(statuses))
+    localStorage.setItem('hierarch-statuses', JSON.stringify(statuses))
   }, [statuses])
 
   useEffect(() => {
-    localStorage.setItem('flowki-show-project-icons', String(showProjectIcons))
+    localStorage.setItem('hierarch-show-project-icons', String(showProjectIcons))
   }, [showProjectIcons])
 
   // Keyboard shortcuts
@@ -181,7 +229,7 @@ export default function App() {
     const handler = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key === ',') {
         e.preventDefault()
-        handleTaskCreate({ title: '', status: 'Backlog' })
+        handleTaskCreate({ title: '', status: statuses[0]?.id || 'explore' })
       }
     }
     window.addEventListener('keydown', handler)
@@ -249,7 +297,7 @@ export default function App() {
       id: tempId,
       title: taskData.title || '',
       description: taskData.description || '',
-      status: taskData.status || 'Backlog',
+      status: taskData.status || statuses[0]?.id || 'explore',
       tags: taskData.tags || [],
       dueDate: taskData.dueDate || '',
       assignees: taskData.assignees || [],
@@ -273,7 +321,6 @@ export default function App() {
 
     if (result) {
       tempIdMapping.current[tempId] = result.id
-      setTasks(prev => prev.map(t => t.id === tempId ? { ...t, id: result.id } : t))
     } else {
       toast.error('Failed to create task')
       setTasks(prev => prev.filter(t => t.id !== tempId))
@@ -285,6 +332,27 @@ export default function App() {
   }
 
   const handleTaskUpdate = async (id: string, updates: Partial<Task>) => {
+    // If status is changing, record a phase transition
+    if (updates.status !== undefined) {
+      const currentTask = tasks.find(t => t.id === id)
+      if (currentTask && updates.status !== currentTask.status) {
+        const transition: PhaseTransition = {
+          id: `pt-${Date.now()}`,
+          fromPhase: currentTask.status,
+          toPhase: updates.status,
+          timestamp: new Date().toISOString(),
+        }
+        const history = [...(currentTask.phaseHistory ?? []), transition]
+        updates = { ...updates, phaseHistory: history }
+
+        // Check if entering a feedback phase
+        const targetPhase = statuses.find(s => s.id === updates.status)
+        if (targetPhase?.isFeedback) {
+          setFeedbackPrompt({ taskId: id, fromPhase: currentTask.status })
+        }
+      }
+    }
+
     setTasks(prev => prev.map(t => t.id === id ? { ...t, ...updates } : t))
     if (selectedTask?.id === id) {
       setSelectedTask(prev => prev ? { ...prev, ...updates } : prev)
@@ -294,6 +362,26 @@ export default function App() {
     const realId = resolveTaskId(id)
     const result = await api.updateTask(realId, updates)
     if (!result) toast.error('Failed to update task')
+  }
+
+  const handleFeedbackConfirm = (reviewer: string, deadline: string, notes: string) => {
+    if (!feedbackPrompt) return
+    const task = tasks.find(t => t.id === feedbackPrompt.taskId)
+    if (task?.phaseHistory) {
+      const history = [...task.phaseHistory]
+      const lastEntry = history[history.length - 1]
+      if (lastEntry) {
+        lastEntry.reviewer = reviewer || undefined
+        lastEntry.deadline = deadline || undefined
+        lastEntry.notes = notes || undefined
+      }
+      handleTaskUpdate(feedbackPrompt.taskId, { phaseHistory: history })
+    }
+    setFeedbackPrompt(null)
+  }
+
+  const handleFeedbackSkip = () => {
+    setFeedbackPrompt(null)
   }
 
   const handleTaskDelete = async (id: string) => {
@@ -311,6 +399,7 @@ export default function App() {
   }
 
   const handleTaskClick = (task: Task) => {
+    setNewTaskDrawerOpen(false)
     setSelectedTask(task)
     setTaskDrawerOpen(true)
   }
@@ -362,6 +451,47 @@ export default function App() {
     const result = await api.deleteResource(id)
     if (!result) toast.error('Failed to delete resource')
     else toast.success('Resource deleted')
+  }
+
+  // Design note operations
+  useEffect(() => {
+    localStorage.setItem('hierarch-design-notes', JSON.stringify(designNotes))
+  }, [designNotes])
+
+  const handleNoteCreate = (projectId: string) => {
+    const note: DesignNote = {
+      id: `dn-${Date.now()}`,
+      title: '',
+      text: '',
+      type: 'freeform',
+      projectId: projectId || undefined,
+      timestamp: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    }
+    setDesignNotes(prev => [note, ...prev])
+    setSelectedNote(note)
+    setNoteDrawerOpen(true)
+    setTaskDrawerOpen(false)
+    setNewTaskDrawerOpen(false)
+  }
+
+  const handleNoteClick = (note: DesignNote) => {
+    setSelectedNote(note)
+    setNoteDrawerOpen(true)
+    setTaskDrawerOpen(false)
+    setNewTaskDrawerOpen(false)
+  }
+
+  const handleNoteUpdate = (id: string, updates: Partial<DesignNote>) => {
+    setDesignNotes(prev => prev.map(n => n.id === id ? { ...n, ...updates } : n))
+    if (selectedNote?.id === id) {
+      setSelectedNote(prev => prev ? { ...prev, ...updates } : prev)
+    }
+  }
+
+  const handleNoteDelete = (id: string) => {
+    setDesignNotes(prev => prev.filter(n => n.id !== id))
+    if (selectedNote?.id === id) setSelectedNote(null)
   }
 
   // Time entry operations
@@ -427,6 +557,12 @@ export default function App() {
     }
   }
 
+  const handleOpenNewTask = (defaultProjectId?: string) => {
+    setTaskDrawerOpen(false)
+    setNewTaskDefaultProjectId(defaultProjectId)
+    setNewTaskDrawerOpen(true)
+  }
+
   // Auth handlers
   const handleLogin = async () => {
     const { data: { user } } = await supabase.auth.getUser()
@@ -439,7 +575,7 @@ export default function App() {
   const handleLogout = async () => {
     if (demoMode) {
       setDemoMode(false)
-      localStorage.removeItem('flowki-demo')
+      localStorage.removeItem('hierarch-demo')
     } else {
       await supabase.auth.signOut()
     }
@@ -458,6 +594,10 @@ export default function App() {
 
   const handleOnboardingComplete = async () => {
     setShowOnboarding(false)
+    if (demoMode) {
+      setAuthState('authenticated')
+      return
+    }
     const { data: { user: updatedUser } } = await supabase.auth.getUser()
     if (updatedUser) {
       setUser(updatedUser)
@@ -486,12 +626,12 @@ export default function App() {
     const today = new Date()
     today.setHours(0, 0, 0, 0)
     const doneStatus = statuses.find(s => s.isDone)
-    return d < today && t.status !== doneStatus?.title
+    return d < today && t.status !== doneStatus?.id
   })
 
   const todayCount = todayTasks.length + overdueTasks.length
   const doneStatus = statuses.find(s => s.isDone)
-  const allTasksCount = tasks.filter(t => t.status !== doneStatus?.title).length
+  const allTasksCount = tasks.filter(t => t.status !== doneStatus?.id).length
 
   // View change handler
   const handleViewChange = (view: string) => {
@@ -503,16 +643,19 @@ export default function App() {
   const renderView = () => {
     if (activeView === 'today') {
       return (
-        <TodayOverview
+        <Briefing
           tasks={tasks}
           projects={projects}
-          resources={resources}
           statuses={statuses}
-          onTaskCreate={handleTaskCreate}
-          onTaskUpdate={handleTaskUpdate}
-          onTaskDelete={handleTaskDelete}
-          onTaskClick={handleTaskClick}
           userName={user?.user_metadata?.name || 'there'}
+          onTaskClick={handleTaskClick}
+          onTaskCreate={handleTaskCreate}
+          onViewChange={handleViewChange}
+          onNewTask={() => handleOpenNewTask()}
+          designNotes={designNotes}
+          onNoteCreate={handleNoteCreate}
+          onNoteClick={handleNoteClick}
+          onProjectUpdate={handleProjectUpdate}
         />
       )
     }
@@ -528,6 +671,10 @@ export default function App() {
           onTaskDelete={handleTaskDelete}
           onTaskClick={handleTaskClick}
           onStatusesChange={setStatuses}
+          onNewTask={() => handleOpenNewTask()}
+          onStartFocus={(task: Task) => { setFocusTask(task); setActiveView('focus'); }}
+          onCreateNote={(task: Task) => handleNoteCreate(task.project || '')}
+          focusTaskId={focusTask?.id}
           projectFilter={undefined}
         />
       )
@@ -550,6 +697,7 @@ export default function App() {
           resources={projectResources}
           onProjectUpdate={handleProjectUpdate}
           onTaskCreate={(t) => handleTaskCreate({ ...t, project: project.id })}
+          onNewTask={() => handleOpenNewTask(project.id)}
           onTaskUpdate={handleTaskUpdate}
           onTaskDelete={handleTaskDelete}
           onTaskClick={handleTaskClick}
@@ -557,6 +705,7 @@ export default function App() {
           onResourceCreate={(r) => handleResourceCreate({ ...r, projectId: project.id })}
           onResourceUpdate={handleResourceUpdate}
           onResourceDelete={handleResourceDelete}
+          onCreateNote={(task: Task) => handleNoteCreate(task.project || '')}
         />
       )
     }
@@ -587,13 +736,21 @@ export default function App() {
       return (
         <CapacityView
           projects={projects}
+          tasks={tasks}
           onProjectClick={(name) => handleViewChange(`project:${name}`)}
         />
       )
     }
 
     if (activeView === 'focus') {
-      return <FocusTimerView onSaveEntry={handleSaveTimeEntry} />
+      return (
+        <FocusTimerView
+          task={focusTask}
+          onSaveEntry={handleSaveTimeEntry}
+          onTaskUpdate={handleTaskUpdate}
+          onClose={() => { setFocusTask(null); setActiveView('tasks'); }}
+        />
+      )
     }
 
     if (activeView === 'figma') return <FigmaView />
@@ -623,7 +780,7 @@ export default function App() {
   }
 
   const getViewTitle = () => {
-    if (activeView === 'today') return 'Today'
+    if (activeView === 'today') return 'Overview'
     if (activeView === 'tasks') return 'All Tasks'
     if (activeView.startsWith('project:')) return activeView.replace('project:', '')
     if (activeView === 'attachments') return 'Resources'
@@ -661,15 +818,6 @@ export default function App() {
     )
   }
 
-  if (authState === 'avatar') {
-    return (
-      <ThemeProvider defaultTheme="dark">
-        <Toaster richColors position="top-right" />
-        <AvatarSelection onComplete={handleAvatarComplete} />
-      </ThemeProvider>
-    )
-  }
-
   if (authState === 'onboarding' || showOnboarding) {
     return (
       <ThemeProvider defaultTheme="dark">
@@ -700,7 +848,7 @@ export default function App() {
               user={user}
               onLogout={handleLogout}
               onShowOnboarding={() => setShowOnboarding(true)}
-              onNewTask={() => handleTaskCreate({ title: 'New Task', status: statuses[0]?.id || 'backlog' })}
+              onNewTask={() => handleOpenNewTask()}
             />
           )}
 
@@ -719,14 +867,19 @@ export default function App() {
               user={user}
               onLogout={handleLogout}
               onShowOnboarding={() => setShowOnboarding(true)}
-              onNewTask={() => handleTaskCreate({ title: 'New Task', status: statuses[0]?.id || 'backlog' })}
+              onNewTask={() => handleOpenNewTask()}
               isMobile
               onClose={() => setSidebarOpen(false)}
             />
           )}
 
           {/* Main content */}
-          <main className="flex-1 flex flex-col overflow-hidden bg-background rounded-xl mt-2 mr-2 mb-2 ml-0 border border-white/[0.06]">
+          <motion.main
+            className="flex-1 flex flex-col overflow-hidden bg-background rounded-xl mt-2 mr-2 mb-2 ml-0 border border-white/[0.06]"
+            initial={{ x: 24, opacity: 0 }}
+            animate={{ x: 0, opacity: 1 }}
+            transition={{ duration: 0.35, ease: 'easeOut' }}
+          >
             {/* Mobile header */}
             {isMobile && (
               <header className="flex items-center gap-3 px-4 border-b border-border bg-card" style={{ minHeight: 56 }}>
@@ -745,21 +898,35 @@ export default function App() {
             )}
 
             {/* View content */}
-            <div className="flex-1 overflow-auto">
-              <AnimatePresence mode="wait">
-                <motion.div
-                  key={activeView}
-                  initial={{ opacity: 0, y: 8 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -8 }}
-                  transition={{ duration: 0.15 }}
-                  className="h-full"
-                >
-                  {renderView()}
-                </motion.div>
-              </AnimatePresence>
+            <div className="flex-1 overflow-y-scroll scrollbar-auto-hide">
+              {dataLoading ? (
+                <div className="h-full" />
+              ) : (
+                <AnimatePresence mode="wait">
+                  <motion.div
+                    key={activeView}
+                    initial={{ opacity: 0, y: 8 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -8 }}
+                    transition={{ duration: 0.15 }}
+                    className="h-full"
+                  >
+                    {renderView()}
+                  </motion.div>
+                </AnimatePresence>
+              )}
             </div>
-          </main>
+          </motion.main>
+
+          {/* New task drawer */}
+          <NewTaskDrawer
+            open={newTaskDrawerOpen}
+            onOpenChange={setNewTaskDrawerOpen}
+            projects={projects}
+            statuses={statuses}
+            defaultProjectId={newTaskDefaultProjectId}
+            onSave={handleTaskCreate}
+          />
 
           {/* Task details drawer */}
           <TaskDetailsDrawer
@@ -773,7 +940,23 @@ export default function App() {
             onDelete={handleTaskDelete}
             onResourceCreate={handleResourceCreate}
           />
+
+          {/* Note drawer */}
+          <NoteDrawer
+            note={selectedNote}
+            open={noteDrawerOpen}
+            onOpenChange={setNoteDrawerOpen}
+            projects={projects}
+            onUpdate={handleNoteUpdate}
+            onDelete={handleNoteDelete}
+          />
         </div>
+
+        <FeedbackPrompt
+          open={feedbackPrompt !== null}
+          onConfirm={handleFeedbackConfirm}
+          onSkip={handleFeedbackSkip}
+        />
 
         <UpdateNotification />
       </TooltipProvider>

@@ -1,5 +1,6 @@
-import { useState, useEffect, useCallback } from 'react'
-import { motion, AnimatePresence } from 'motion/react'
+import { useState, useEffect, useCallback, useRef } from 'react'
+import { formatDistanceToNow } from 'date-fns'
+import { motion } from 'motion/react'
 import { toast } from 'sonner'
 import {
   ExternalLink, Figma, Plus, RefreshCw, ChevronDown,
@@ -23,8 +24,8 @@ import { cn } from '../lib/utils'
 import * as linearApi from '../api/linear'
 import type { LinearIssue, LinearTeam, LinearStatus, DesignMeta } from '../api/linear'
 
-const TOKEN_KEY = 'flowki-linear-token'
-const TEAM_KEY = 'flowki-linear-team'
+const TOKEN_KEY = 'hierarch-linear-token'
+const TEAM_KEY = 'hierarch-linear-team'
 
 // ── Setup Screen ────────────────────────────────────────────────────────────
 
@@ -94,78 +95,6 @@ function PriorityDot({ priority }: { priority: number }) {
   )
 }
 
-// ── Issue Card ──────────────────────────────────────────────────────────────
-
-function IssueCard({
-  issue,
-  meta,
-  onClick,
-}: {
-  issue: LinearIssue
-  meta: DesignMeta
-  onClick: () => void
-}) {
-  return (
-    <motion.button
-      layout
-      initial={{ opacity: 0, y: 8 }}
-      animate={{ opacity: 1, y: 0 }}
-      onClick={onClick}
-      className="w-full text-left bg-card border border-border rounded-lg p-3 hover:border-[#5E6AD2]/50 hover:bg-accent/30 transition-colors group"
-    >
-      <div className="flex items-start justify-between gap-2 mb-2">
-        <span className="text-[10px] text-muted-foreground font-mono">{issue.identifier}</span>
-        <PriorityDot priority={issue.priority} />
-      </div>
-      <p className="text-sm font-medium leading-snug line-clamp-2 mb-2 text-foreground">{issue.title}</p>
-
-      <div className="flex items-center gap-1.5 flex-wrap">
-        {/* Design type badge */}
-        {meta.designType && (
-          <span className={cn('text-[10px] px-1.5 py-0.5 rounded font-medium', linearApi.DESIGN_TYPES[meta.designType]?.color)}>
-            {linearApi.DESIGN_TYPES[meta.designType]?.label}
-          </span>
-        )}
-
-        {/* Linear labels */}
-        {issue.labels.map(l => (
-          <span
-            key={l.id}
-            className="text-[10px] px-1.5 py-0.5 rounded font-medium"
-            style={{ background: `${l.color}22`, color: l.color }}
-          >
-            {l.name}
-          </span>
-        ))}
-
-        {/* Figma indicator */}
-        {meta.figmaUrl && (
-          <span className="text-[10px] text-muted-foreground flex items-center gap-0.5 ml-auto">
-            <Figma className="h-2.5 w-2.5" /> Figma
-          </span>
-        )}
-      </div>
-
-      {/* Checklist progress */}
-      {meta.checklist && meta.checklist.length > 0 && (
-        <div className="mt-2">
-          <div className="flex gap-0.5">
-            {meta.checklist.map(item => (
-              <div
-                key={item.id}
-                className={cn('h-1 flex-1 rounded-full', item.done ? 'bg-[#5E6AD2]' : 'bg-border')}
-              />
-            ))}
-          </div>
-          <span className="text-[10px] text-muted-foreground mt-0.5 block">
-            {meta.checklist.filter(c => c.done).length}/{meta.checklist.length} checks
-          </span>
-        </div>
-      )}
-    </motion.button>
-  )
-}
-
 // ── Issue Detail Drawer ─────────────────────────────────────────────────────
 
 function IssueDrawer({
@@ -191,16 +120,58 @@ function IssueDrawer({
   })
   const [saving, setSaving] = useState(false)
   const [title, setTitle] = useState(issue.title)
+  const figmaAttachmentId = useRef<string | null>(null)
+
+  // Load existing Figma attachment from Linear on mount
+  useEffect(() => {
+    linearApi.getAttachments(token, issue.id)
+      .then(attachments => {
+        const figma = attachments.find(a => a.url.includes('figma.com'))
+        if (figma) {
+          figmaAttachmentId.current = figma.id
+          if (!meta.figmaUrl) {
+            setMeta(prev => ({ ...prev, figmaUrl: figma.url }))
+            linearApi.saveDesignMeta(issue.id, { ...meta, figmaUrl: figma.url })
+          }
+        }
+      })
+      .catch(() => { /* ignore — attachment fetch is best-effort */ })
+  }, [issue.id, token])
 
   const saveMeta = useCallback((updated: DesignMeta) => {
     setMeta(updated)
     linearApi.saveDesignMeta(issue.id, updated)
   }, [issue.id])
 
+  const syncFigmaToLinear = async () => {
+    const url = meta.figmaUrl?.trim()
+    if (!url) {
+      // Clear attachment if URL was removed
+      if (figmaAttachmentId.current) {
+        try {
+          await linearApi.deleteAttachment(token, figmaAttachmentId.current)
+          figmaAttachmentId.current = null
+        } catch { /* ignore */ }
+      }
+      return
+    }
+    try {
+      // Delete old attachment first if it exists
+      if (figmaAttachmentId.current) {
+        await linearApi.deleteAttachment(token, figmaAttachmentId.current).catch(() => {})
+      }
+      const attachment = await linearApi.createAttachment(token, issue.id, url, 'Figma Design')
+      figmaAttachmentId.current = attachment.id
+      toast.success('Figma link synced to Linear')
+    } catch {
+      toast.error('Failed to sync Figma link to Linear')
+    }
+  }
+
   const handleStatusChange = async (statusId: string) => {
     setSaving(true)
     try {
-      const updated = await linearApi.updateIssue(token, issue.id, { statusId })
+      const updated = await linearApi.updateIssue(token, issue.id, { stateId: statusId })
       onUpdate(updated)
       toast.success('Status updated')
     } catch {
@@ -328,6 +299,7 @@ function IssueDrawer({
                   placeholder="https://figma.com/file/…"
                   value={meta.figmaUrl || ''}
                   onChange={e => saveMeta({ ...meta, figmaUrl: e.target.value })}
+                  onBlur={syncFigmaToLinear}
                   className="text-sm font-mono"
                 />
                 {meta.figmaUrl && (
@@ -454,7 +426,7 @@ function CreateIssueDialog({
         teamId,
         title: title.trim(),
         description: description.trim() || undefined,
-        statusId: statusId || undefined,
+        stateId: statusId || undefined,
         priority,
       })
       if (designType) {
@@ -629,14 +601,6 @@ function LinearBoard({
     setIssues(prev => [issue, ...prev])
   }
 
-  // Group issues by status
-  const issuesByStatus = statuses.reduce<Record<string, LinearIssue[]>>((acc, s) => {
-    acc[s.id] = issues.filter(i => i.status.id === s.id)
-    return acc
-  }, {})
-
-  const visibleStatuses = statuses.filter(s => s.type !== 'cancelled')
-
   if (loading) {
     return (
       <div className="flex items-center justify-center h-full min-h-[400px] gap-2 text-muted-foreground">
@@ -687,47 +651,106 @@ function LinearBoard({
         </div>
       </div>
 
-      {/* Board */}
-      <div className="flex-1 overflow-x-auto">
-        <div className="flex gap-4 p-6 h-full" style={{ minWidth: `${visibleStatuses.length * 280}px` }}>
-          {visibleStatuses.map(status => {
-            const cols = issuesByStatus[status.id] || []
-            return (
-              <div key={status.id} className="flex flex-col gap-3 w-[260px] shrink-0">
-                {/* Column header */}
-                <div className="flex items-center gap-2">
-                  <span
-                    className="w-2 h-2 rounded-full shrink-0"
-                    style={{ background: status.color }}
-                  />
-                  <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
-                    {status.name}
-                  </span>
-                  <span className="text-xs text-muted-foreground ml-auto">{cols.length}</span>
-                </div>
-
-                {/* Issue cards */}
-                <div className="flex flex-col gap-2">
-                  <AnimatePresence>
-                    {cols.map(issue => (
-                      <IssueCard
-                        key={issue.id}
-                        issue={issue}
-                        meta={linearApi.getDesignMeta(issue.id)}
-                        onClick={() => setSelectedIssue(issue)}
-                      />
-                    ))}
-                  </AnimatePresence>
-                  {cols.length === 0 && (
-                    <div className="h-16 rounded-lg border border-dashed border-border/50 flex items-center justify-center">
-                      <span className="text-xs text-muted-foreground/50">No issues</span>
-                    </div>
-                  )}
-                </div>
-              </div>
-            )
-          })}
-        </div>
+      {/* Table */}
+      <div className="flex-1 overflow-auto">
+        <table className="w-full text-sm">
+          <thead className="sticky top-0 z-10 bg-background">
+            <tr className="border-b border-border text-xs text-muted-foreground uppercase tracking-wide">
+              <th className="text-left font-medium px-6 py-3 w-[80px]">ID</th>
+              <th className="text-left font-medium px-3 py-3">Title</th>
+              <th className="text-left font-medium px-3 py-3 w-[130px]">Status</th>
+              <th className="text-left font-medium px-3 py-3 w-[70px]">Priority</th>
+              <th className="text-left font-medium px-3 py-3 w-[100px]">Type</th>
+              <th className="text-left font-medium px-3 py-3 w-[140px]">Assignee</th>
+              <th className="text-left font-medium px-3 py-3 w-[100px]">Updated</th>
+            </tr>
+          </thead>
+          <tbody>
+            {issues.length === 0 ? (
+              <tr>
+                <td colSpan={7} className="text-center text-muted-foreground py-16">
+                  No issues found
+                </td>
+              </tr>
+            ) : (
+              issues.map(issue => {
+                const meta = linearApi.getDesignMeta(issue.id)
+                return (
+                  <motion.tr
+                    key={issue.id}
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    onClick={() => setSelectedIssue(issue)}
+                    className="border-b border-border/40 hover:bg-accent/20 cursor-pointer transition-colors"
+                  >
+                    <td className="px-6 py-3 font-mono text-xs text-muted-foreground whitespace-nowrap">
+                      {issue.identifier}
+                    </td>
+                    <td className="px-3 py-3">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <span className="truncate font-medium text-foreground">{issue.title}</span>
+                        {meta.figmaUrl && (
+                          <Figma className="h-3 w-3 text-muted-foreground/50 shrink-0" />
+                        )}
+                        {issue.labels.length > 0 && (
+                          <div className="flex gap-1 shrink-0">
+                            {issue.labels.slice(0, 2).map(l => (
+                              <span
+                                key={l.id}
+                                className="text-[10px] px-1.5 py-0.5 rounded font-medium"
+                                style={{ background: `${l.color}22`, color: l.color }}
+                              >
+                                {l.name}
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </td>
+                    <td className="px-3 py-3 whitespace-nowrap">
+                      <div className="flex items-center gap-2">
+                        <span
+                          className="w-2 h-2 rounded-full shrink-0"
+                          style={{ background: issue.status.color }}
+                        />
+                        <span className="text-xs text-muted-foreground">{issue.status.name}</span>
+                      </div>
+                    </td>
+                    <td className="px-3 py-3">
+                      <PriorityDot priority={issue.priority} />
+                    </td>
+                    <td className="px-3 py-3">
+                      {meta.designType && (
+                        <span className={cn('text-[10px] px-1.5 py-0.5 rounded font-medium', linearApi.DESIGN_TYPES[meta.designType]?.color)}>
+                          {linearApi.DESIGN_TYPES[meta.designType]?.label}
+                        </span>
+                      )}
+                    </td>
+                    <td className="px-3 py-3 whitespace-nowrap">
+                      {issue.assignee ? (
+                        <div className="flex items-center gap-2">
+                          {issue.assignee.avatarUrl ? (
+                            <img src={issue.assignee.avatarUrl} className="w-5 h-5 rounded-full" alt="" />
+                          ) : (
+                            <div className="w-5 h-5 rounded-full bg-[#5E6AD2]/20 flex items-center justify-center text-[9px] font-semibold text-[#5E6AD2]">
+                              {issue.assignee.name[0]}
+                            </div>
+                          )}
+                          <span className="text-xs text-muted-foreground">{issue.assignee.name}</span>
+                        </div>
+                      ) : (
+                        <span className="text-xs text-muted-foreground/40">—</span>
+                      )}
+                    </td>
+                    <td className="px-3 py-3 text-xs text-muted-foreground/60 whitespace-nowrap">
+                      {formatDistanceToNow(new Date(issue.updatedAt), { addSuffix: true })}
+                    </td>
+                  </motion.tr>
+                )
+              })
+            )}
+          </tbody>
+        </table>
       </div>
 
       {/* Issue drawer */}

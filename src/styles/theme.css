@@ -38,7 +38,7 @@
   --card-foreground: #1A1815;
   --popover: #FFFFFF;
   --popover-foreground: #1A1815;
-  --primary: #6B3FF5;
+  --primary: #bf7535;
   --primary-foreground: #FFFFFF;
   --secondary: #F0EDE8;
   --secondary-foreground: #1A1815;
@@ -50,7 +50,7 @@
   --destructive-foreground: #FFFFFF;
   --border: #E0DAD2;
   --input: #E0DAD2;
-  --ring: #6B3FF5;
+  --ring: #bf7535;
   --sidebar: #F2EEE8;
   --sidebar-foreground: #1A1815;
 }
@@ -63,7 +63,7 @@
   --card-foreground: #EAE7E1;
   --popover: #1E1C1A;
   --popover-foreground: #EAE7E1;
-  --primary: #7C5CFC;
+  --primary: #cd8a3a;
   --primary-foreground: #FFFFFF;
   --secondary: #262320;
   --secondary-foreground: #EAE7E1;
@@ -75,7 +75,7 @@
   --destructive-foreground: #FFFFFF;
   --border: #2C2925;
   --input: #2C2925;
-  --ring: #7C5CFC;
+  --ring: #cd8a3a;
   --sidebar: #0B0A09;
   --sidebar-foreground: #EAE7E1;
 }
@@ -102,6 +102,30 @@
 * {
   scrollbar-width: thin;
   scrollbar-color: var(--border) transparent;
+}
+
+/* ─── Auto-hide scrollbar (fade on hover) ─── */
+.scrollbar-auto-hide {
+  scrollbar-width: thin;
+  scrollbar-color: transparent transparent;
+}
+.scrollbar-auto-hide::-webkit-scrollbar-thumb {
+  background: transparent;
+  transition: background 0.2s;
+}
+.scrollbar-auto-hide:hover {
+  scrollbar-color: var(--border) transparent;
+}
+.scrollbar-auto-hide:hover::-webkit-scrollbar-thumb {
+  background: var(--border);
+}
+
+/* ─── Contenteditable placeholder ─── */
+[contenteditable][data-placeholder]:empty::before {
+  content: attr(data-placeholder);
+  color: var(--muted-foreground);
+  opacity: 0.4;
+  pointer-events: none;
 }
 
 @media (max-width: 768px) {

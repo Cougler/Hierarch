@@ -80,19 +80,19 @@ export default function Login({ onLogin, onSwitchToSignup, onDemoLogin }: LoginP
         <div className="mb-8 text-center">
           <div className="mb-3 inline-flex items-center gap-2">
             <img src="/logo.svg" className="h-8 w-8" alt="Hierarch" />
-            <h1 className="text-4xl font-bold tracking-tight text-white">Hierarch</h1>
+            <h1 className="text-4xl font-bold tracking-tight text-foreground">Hierarch</h1>
           </div>
-          <p className="text-sm text-gray-400">Build today, ship tomorrow.</p>
+          <p className="text-sm text-muted-foreground">Build today, ship tomorrow.</p>
         </div>
 
-        <Card className="border-white/10 bg-white/5 backdrop-blur-xl">
+        <Card className="border-border bg-card">
           {/* Google OAuth */}
           <div className="px-6 pt-6 pb-4">
             <Button
               type="button"
               onClick={handleGoogleSignIn}
               disabled={googleLoading}
-              className="w-full border border-white/10 bg-white/5 text-white hover:bg-white/10"
+              className="w-full"
               variant="outline"
               size="lg"
             >
@@ -106,48 +106,48 @@ export default function Login({ onLogin, onSwitchToSignup, onDemoLogin }: LoginP
 
             <div className="relative my-4">
               <div className="absolute inset-0 flex items-center">
-                <div className="w-full border-t border-white/10" />
+                <div className="w-full border-t border-border" />
               </div>
               <div className="relative flex justify-center text-xs">
-                <span className="bg-transparent px-2 text-gray-500">or</span>
+                <span className="bg-card px-2 text-muted-foreground">or</span>
               </div>
             </div>
           </div>
 
           <form onSubmit={handleSubmit}>
             <CardHeader className="pb-4 pt-0">
-              <h2 className="text-lg font-semibold text-white">Sign in with email</h2>
-              <p className="text-sm text-gray-400">Enter your credentials to continue</p>
+              <h2 className="text-lg font-semibold text-foreground">Sign in with email</h2>
+              <p className="text-sm text-muted-foreground">Enter your credentials to continue</p>
             </CardHeader>
 
             <CardContent className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="email" className="text-gray-300">Email</Label>
+                <Label htmlFor="email" className="text-foreground">Email</Label>
                 <div className="relative">
-                  <Mail className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-500" />
+                  <Mail className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                   <Input
                     id="email"
                     type="email"
                     placeholder="you@example.com"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    className="border-white/10 bg-white/5 pl-10 text-white placeholder:text-gray-500 focus-visible:ring-teal-500"
+                    className="pl-10"
                     autoComplete="email"
                   />
                 </div>
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="password" className="text-gray-300">Password</Label>
+                <Label htmlFor="password" className="text-foreground">Password</Label>
                 <div className="relative">
-                  <Lock className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-500" />
+                  <Lock className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                   <Input
                     id="password"
                     type="password"
                     placeholder="••••••••"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    className="border-white/10 bg-white/5 pl-10 text-white placeholder:text-gray-500 focus-visible:ring-teal-500"
+                    className="pl-10"
                     autoComplete="current-password"
                   />
                 </div>
@@ -158,9 +158,8 @@ export default function Login({ onLogin, onSwitchToSignup, onDemoLogin }: LoginP
                   id="remember"
                   checked={rememberMe}
                   onCheckedChange={(checked) => setRememberMe(checked === true)}
-                  className="border-white/20 data-[state=checked]:bg-teal-500 data-[state=checked]:border-teal-500"
                 />
-                <Label htmlFor="remember" className="cursor-pointer text-sm text-gray-400">
+                <Label htmlFor="remember" className="cursor-pointer text-sm text-muted-foreground">
                   Remember me
                 </Label>
               </div>
@@ -170,7 +169,7 @@ export default function Login({ onLogin, onSwitchToSignup, onDemoLogin }: LoginP
               <Button
                 type="submit"
                 disabled={loading}
-                className="w-full bg-teal-500 text-white hover:bg-teal-600 disabled:opacity-50"
+                className="w-full bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
                 size="lg"
               >
                 {loading ? (
@@ -188,21 +187,21 @@ export default function Login({ onLogin, onSwitchToSignup, onDemoLogin }: LoginP
                   type="button"
                   variant="outline"
                   onClick={onDemoLogin}
-                  className="w-full border-white/10 text-gray-300 hover:bg-white/5 hover:text-white"
+                  className="w-full"
                   size="lg"
                 >
                   Try Demo — No Account Needed
                 </Button>
               )}
 
-              <p className="text-center text-sm text-gray-400">
+              <p className="text-center text-sm text-muted-foreground">
                 Don&apos;t have an account?{' '}
                 <button
                   type="button"
                   onClick={onSwitchToSignup}
                   className={cn(
-                    'font-medium text-teal-400 underline-offset-4 transition-colors',
-                    'hover:text-teal-300 hover:underline'
+                    'font-medium text-primary underline-offset-4 transition-colors',
+                    'hover:text-primary/80 hover:underline'
                   )}
                 >
                   Create one

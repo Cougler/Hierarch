@@ -72,7 +72,7 @@ export function ColumnManager({ columns: initialColumns, onChange, open, onOpenC
               </Label>
               <Slider
                 value={[col.width]}
-                onValueChange={([w]) => updateWidth(col.id, w)}
+                onValueChange={([w = 0]) => updateWidth(col.id, w)}
                 min={100}
                 max={500}
                 step={10}

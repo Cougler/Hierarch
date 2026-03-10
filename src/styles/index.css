@@ -24,27 +24,11 @@
 
   /* Text selection */
   ::selection {
-    background-color: rgb(124 92 252 / 0.18);
+    background-color: rgb(191 117 53 / 0.25);
     color: inherit;
   }
 
   .dark ::selection {
-    background-color: rgb(124 92 252 / 0.30);
-  }
-}
-
-/* ─── Primary button gradient ─── */
-@layer utilities {
-  .bg-primary {
-    background-image: linear-gradient(155deg, #9070FD 0%, #5E2FF0 100%);
-  }
-
-  .dark .bg-primary {
-    background-image: linear-gradient(155deg, #9070FD 0%, #5E2FF0 100%);
-  }
-
-  .hover\:bg-primary\/90:hover,
-  .bg-primary:hover {
-    background-image: linear-gradient(155deg, #9B7EFE 0%, #6A3DF2 100%);
+    background-color: rgb(205 138 58 / 0.30);
   }
 }

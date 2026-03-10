@@ -10,6 +10,7 @@ import { CSS } from '@dnd-kit/utilities';
 import { format, isToday, isPast, parseISO } from 'date-fns';
 import type { Task, StatusConfig, Project } from '@/app/types';
 import { TaskContextMenu } from '@/app/components/TaskContextMenu';
+import { getIconComponent } from '@/app/components/IconPicker';
 
 interface TaskCardProps {
   task: Task;
@@ -82,12 +83,12 @@ export function TaskCard({ task, projects, statuses, onUpdate, onDelete, onClick
         )}
       >
         <div className="flex items-start gap-2.5">
-          <Checkbox
-            checked={isDone}
-            onCheckedChange={handleToggle}
-            onClick={(e) => e.stopPropagation()}
-            className="mt-0.5 shrink-0"
-          />
+          <span
+            className="mt-0.5 shrink-0 cursor-pointer flex items-center justify-center h-4 w-4"
+            onClick={(e) => { e.stopPropagation(); handleToggle(); }}
+          >
+            <span className={cn('block h-2 w-2 rounded-full', statusConfig?.color ?? 'bg-slate-500')} />
+          </span>
           <div className="min-w-0 flex-1 space-y-2">
             <p className={cn(
               'text-sm font-medium leading-snug',
@@ -106,7 +107,7 @@ export function TaskCard({ task, projects, statuses, onUpdate, onDelete, onClick
                     : undefined
                   }
                 >
-                  {project.metadata?.icon && <span className="mr-0.5">{project.metadata.icon}</span>}
+                  {project.metadata?.icon && (() => { const I = getIconComponent(project.metadata!.icon); return <I className="mr-0.5 h-3 w-3 shrink-0" />; })()}
                   {project.name}
                 </Badge>
               )}

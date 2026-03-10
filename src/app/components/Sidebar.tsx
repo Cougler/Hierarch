@@ -22,8 +22,8 @@ import {
   Tooltip, TooltipContent, TooltipProvider, TooltipTrigger,
 } from '@/app/components/ui/tooltip';
 import {
-  CalendarDays, ListTodo, Plus, MoreHorizontal, Pencil, Copy, Trash2,
-  ChevronDown, LogOut, Settings, User, Moon, Sun, X, BarChart2, Timer, Paperclip,
+  Compass, ListTodo, Plus, MoreHorizontal, Pencil, Copy, Trash2,
+  ChevronDown, LogOut, Settings, User, Moon, Sun, X, BarChart2, Paperclip,
   SquarePen, FolderPlus, CheckSquare, Layers,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
@@ -36,7 +36,7 @@ import { IconPicker, getIconComponent } from '@/app/components/IconPicker';
 import type { Project, ProjectMetadata } from '@/app/types';
 import { toast } from 'sonner';
 
-const PROJECTS_VISIBLE = 3;
+const PROJECTS_VISIBLE = 8;
 
 interface SidebarProps {
   projects: Project[];
@@ -94,11 +94,11 @@ function SortableProjectItem({
               'flex w-full items-center gap-2.5 rounded-md px-2 py-1.5 text-sm transition-colors cursor-grab active:cursor-grabbing',
               isActive
                 ? 'bg-accent text-foreground font-medium'
-                : 'text-muted-foreground hover:bg-accent/60 hover:text-foreground',
+                : 'text-foreground/60 hover:bg-accent/60 hover:text-foreground',
               isDragging && 'opacity-50'
             )}
           >
-            <Icon className="h-4 w-4 shrink-0 text-muted-foreground" />
+            <Icon className="h-4 w-4 shrink-0 text-foreground/50" />
             <span className="flex-1 truncate text-left">{project.name}</span>
           </motion.button>
         </ContextMenuTrigger>
@@ -139,7 +139,7 @@ function NavItem({
         'flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm transition-colors',
         isActive
           ? 'bg-accent text-foreground font-medium'
-          : 'text-muted-foreground hover:bg-accent/60 hover:text-foreground'
+          : 'text-foreground/60 hover:bg-accent/60 hover:text-foreground'
       )}
     >
       {icon}
@@ -288,9 +288,8 @@ export function Sidebar({
         {/* Primary nav */}
         <div className="px-3 space-y-1">
           <NavItem
-            icon={<CalendarDays className="h-4 w-4 shrink-0" />}
-            label="Today"
-            count={todayCount}
+            icon={<Compass className="h-4 w-4 shrink-0" />}
+            label="Overview"
             isActive={activeView === 'today'}
             onClick={() => { onViewChange('today'); onClose?.(); }}
           />
@@ -308,12 +307,6 @@ export function Sidebar({
             onClick={() => { onViewChange('capacity'); onClose?.(); }}
           />
           <NavItem
-            icon={<Timer className="h-4 w-4 shrink-0" />}
-            label="Focus Timer"
-            isActive={activeView === 'focus'}
-            onClick={() => { onViewChange('focus'); onClose?.(); }}
-          />
-          <NavItem
             icon={<Paperclip className="h-4 w-4 shrink-0" />}
             label="Resources"
             isActive={activeView === 'attachments'}
@@ -329,7 +322,7 @@ export function Sidebar({
 
         {/* Projects section */}
         <div className="mt-6 px-4 mb-2 flex items-center justify-between">
-          <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/60">
+          <span className="text-[11px] font-semibold uppercase tracking-wider text-foreground/40">
             Projects
           </span>
           <Tooltip>

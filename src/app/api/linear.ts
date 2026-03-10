@@ -10,7 +10,10 @@ async function gql<T>(token: string, query: string, variables?: Record<string, u
     body: JSON.stringify({ query, variables }),
   })
   const json = await res.json()
-  if (json.errors) throw new Error(json.errors[0].message)
+  if (json.errors) {
+    console.error('Linear API errors:', JSON.stringify(json.errors, null, 2))
+    throw new Error(json.errors[0].message)
+  }
   return json.data as T
 }
 
@@ -39,6 +42,20 @@ export interface LinearLabel {
   color: string
 }
 
+export interface LinearIssueRaw {
+  id: string
+  identifier: string
+  title: string
+  description?: string
+  priority: number
+  url: string
+  state: LinearStatus
+  labels: { nodes: LinearLabel[] }
+  assignee?: LinearUser
+  createdAt: string
+  updatedAt: string
+}
+
 export interface LinearIssue {
   id: string
   identifier: string
@@ -51,6 +68,11 @@ export interface LinearIssue {
   assignee?: LinearUser
   createdAt: string
   updatedAt: string
+}
+
+function normalizeIssue(raw: LinearIssueRaw): LinearIssue {
+  const { state, ...rest } = raw
+  return { ...rest, status: state, labels: raw.labels?.nodes ?? [] }
 }
 
 export async function getViewer(token: string): Promise<LinearUser> {
@@ -73,14 +95,14 @@ export async function getTeamStatuses(token: string, teamId: string): Promise<Li
 }
 
 export async function getIssues(token: string, teamId: string): Promise<LinearIssue[]> {
-  const data = await gql<{ team: { issues: { nodes: LinearIssue[] } } }>(
+  const data = await gql<{ team: { issues: { nodes: LinearIssueRaw[] } } }>(
     token,
     `query($teamId: String!) {
       team(id: $teamId) {
-        issues(orderBy: updatedAt) {
+        issues {
           nodes {
             id identifier title description priority url createdAt updatedAt
-            status { id name type color }
+            state { id name type color }
             labels { nodes { id name color } }
             assignee { id name email avatarUrl }
           }
@@ -89,7 +111,7 @@ export async function getIssues(token: string, teamId: string): Promise<LinearIs
     }`,
     { teamId }
   )
-  return data.team.issues.nodes
+  return data.team.issues.nodes.map(normalizeIssue)
 }
 
 export async function createIssue(
@@ -98,18 +120,18 @@ export async function createIssue(
     teamId: string
     title: string
     description?: string
-    statusId?: string
+    stateId?: string
     labelIds?: string[]
     priority?: number
   }
 ): Promise<LinearIssue> {
-  const data = await gql<{ issueCreate: { issue: LinearIssue } }>(
+  const data = await gql<{ issueCreate: { issue: LinearIssueRaw } }>(
     token,
     `mutation($input: IssueCreateInput!) {
       issueCreate(input: $input) {
         issue {
           id identifier title description priority url createdAt updatedAt
-          status { id name type color }
+          state { id name type color }
           labels { nodes { id name color } }
           assignee { id name email avatarUrl }
         }
@@ -117,26 +139,26 @@ export async function createIssue(
     }`,
     { input }
   )
-  return data.issueCreate.issue
+  return normalizeIssue(data.issueCreate.issue)
 }
 
 export async function updateIssue(
   token: string,
   id: string,
   input: {
-    statusId?: string
+    stateId?: string
     description?: string
     priority?: number
     title?: string
   }
 ): Promise<LinearIssue> {
-  const data = await gql<{ issueUpdate: { issue: LinearIssue } }>(
+  const data = await gql<{ issueUpdate: { issue: LinearIssueRaw } }>(
     token,
     `mutation($id: String!, $input: IssueUpdateInput!) {
       issueUpdate(id: $id, input: $input) {
         issue {
           id identifier title description priority url createdAt updatedAt
-          status { id name type color }
+          state { id name type color }
           labels { nodes { id name color } }
           assignee { id name email avatarUrl }
         }
@@ -144,7 +166,54 @@ export async function updateIssue(
     }`,
     { id, input }
   )
-  return data.issueUpdate.issue
+  return normalizeIssue(data.issueUpdate.issue)
+}
+
+// ── Attachments (Figma URLs synced to Linear) ──────────────────────────────
+
+export interface LinearAttachment {
+  id: string
+  url: string
+  title: string
+}
+
+export async function getAttachments(token: string, issueId: string): Promise<LinearAttachment[]> {
+  const data = await gql<{ issue: { attachments: { nodes: LinearAttachment[] } } }>(
+    token,
+    `query($issueId: String!) {
+      issue(id: $issueId) {
+        attachments { nodes { id url title } }
+      }
+    }`,
+    { issueId }
+  )
+  return data.issue.attachments.nodes
+}
+
+export async function createAttachment(
+  token: string,
+  issueId: string,
+  url: string,
+  title: string
+): Promise<LinearAttachment> {
+  const data = await gql<{ attachmentCreate: { attachment: LinearAttachment } }>(
+    token,
+    `mutation($issueId: String!, $url: String!, $title: String!) {
+      attachmentCreate(input: { issueId: $issueId, url: $url, title: $title }) {
+        attachment { id url title }
+      }
+    }`,
+    { issueId, url, title }
+  )
+  return data.attachmentCreate.attachment
+}
+
+export async function deleteAttachment(token: string, id: string): Promise<void> {
+  await gql(
+    token,
+    `mutation($id: String!) { attachmentDelete(id: $id) { success } }`,
+    { id }
+  )
 }
 
 // Design metadata stored locally per issue
@@ -154,7 +223,7 @@ export interface DesignMeta {
   checklist?: { id: string; title: string; done: boolean }[]
 }
 
-const DESIGN_META_KEY = 'flowki-linear-design-meta'
+const DESIGN_META_KEY = 'hierarch-linear-design-meta'
 
 export function getDesignMeta(issueId: string): DesignMeta {
   try {

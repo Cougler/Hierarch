@@ -9,7 +9,7 @@ import {
   DialogFooter, DialogDescription,
 } from '@/app/components/ui/dialog';
 import { Popover, PopoverContent, PopoverTrigger } from '@/app/components/ui/popover';
-import { GripVertical, Plus, Trash2, Check } from 'lucide-react';
+import { GripVertical, Plus, Trash2, Check, MessageSquare } from 'lucide-react';
 import { DndContext, closestCenter, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
 import type { DragEndEvent } from '@dnd-kit/core';
 import { SortableContext, useSortable, verticalListSortingStrategy, arrayMove } from '@dnd-kit/sortable';
@@ -43,12 +43,14 @@ function SortableStatusItem({
   onUpdate,
   onDelete,
   onToggleDone,
+  onToggleFeedback,
   canDelete,
 }: {
   status: StatusConfig;
   onUpdate: (id: string, updates: Partial<StatusConfig>) => void;
   onDelete: (id: string) => void;
   onToggleDone: (id: string) => void;
+  onToggleFeedback: (id: string) => void;
   canDelete: boolean;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
@@ -115,17 +117,29 @@ function SortableStatusItem({
       />
 
       <button
+        onClick={() => onToggleFeedback(status.id)}
+        className={cn(
+          'flex h-6 items-center gap-1 rounded-md px-1.5 text-[10px] font-medium transition-colors',
+          status.isFeedback
+            ? 'bg-orange-500/20 text-orange-500'
+            : 'text-muted-foreground hover:bg-accent'
+        )}
+        title="Feedback phase — prompts for reviewer on entry"
+      >
+        <MessageSquare className="h-3 w-3" />
+      </button>
+
+      <button
         onClick={() => onToggleDone(status.id)}
         className={cn(
-          'flex h-6 items-center gap-1 rounded-md px-2 text-[10px] font-medium transition-colors',
+          'flex h-6 items-center gap-1 rounded-md px-1.5 text-[10px] font-medium transition-colors',
           status.isDone
             ? 'bg-emerald-500/20 text-emerald-500'
             : 'text-muted-foreground hover:bg-accent'
         )}
-        title="Mark as Done status"
+        title="Mark as Handoff / Done phase"
       >
         <Check className="h-3 w-3" />
-        Done
       </button>
 
       <button
@@ -163,13 +177,20 @@ export function StatusManager({ statuses: initialStatuses, onChange, open, onOpe
     })));
   }, []);
 
+  const toggleFeedback = useCallback((id: string) => {
+    setDraft(prev => prev.map(s => ({
+      ...s,
+      isFeedback: s.id === id ? !s.isFeedback : false,
+    })));
+  }, []);
+
   const addStatus = useCallback(() => {
-    const newId = `status-${Date.now()}`;
+    const newId = `phase-${Date.now()}`;
     setDraft(prev => [
       ...prev,
       {
         id: newId,
-        title: 'New Status',
+        title: 'New Phase',
         color: 'bg-slate-500',
         countColor: 'text-slate-400',
         order: prev.length,
@@ -198,9 +219,9 @@ export function StatusManager({ statuses: initialStatuses, onChange, open, onOpe
     <Dialog open={open} onOpenChange={handleOpen}>
       <DialogContent className="max-w-md">
         <DialogHeader>
-          <DialogTitle>Manage Statuses</DialogTitle>
+          <DialogTitle>Manage Phases</DialogTitle>
           <DialogDescription>
-            Configure task status columns. Drag to reorder, mark one as &ldquo;Done&rdquo;.
+            Configure design phases. Drag to reorder. Mark one as feedback (prompts for reviewer) and one as handoff (marks tasks complete).
           </DialogDescription>
         </DialogHeader>
 
@@ -214,6 +235,7 @@ export function StatusManager({ statuses: initialStatuses, onChange, open, onOpe
                   onUpdate={updateStatus}
                   onDelete={deleteStatus}
                   onToggleDone={toggleDone}
+                  onToggleFeedback={toggleFeedback}
                   canDelete={draft.length > 1}
                 />
               ))}
@@ -222,7 +244,7 @@ export function StatusManager({ statuses: initialStatuses, onChange, open, onOpe
 
           <Button variant="outline" size="sm" onClick={addStatus} className="w-full">
             <Plus className="mr-1 h-3.5 w-3.5" />
-            Add Status
+            Add Phase
           </Button>
         </div>
 

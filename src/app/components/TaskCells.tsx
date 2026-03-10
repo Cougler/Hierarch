@@ -7,10 +7,15 @@ import { Badge } from '@/app/components/ui/badge';
 import { Input } from '@/app/components/ui/input';
 import { Button } from '@/app/components/ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from '@/app/components/ui/popover';
-import { Calendar, X } from 'lucide-react';
-import { DayPicker } from 'react-day-picker';
+import { Calendar as CalendarIcon, X } from 'lucide-react';
+import {
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem,
+  DropdownMenuSeparator, DropdownMenuTrigger,
+} from '@/app/components/ui/dropdown-menu';
+import { Calendar } from '@/app/components/ui/calendar';
 import { format, isToday, isPast, parseISO } from 'date-fns';
 import type { Project } from '@/app/types';
+import { getIconComponent } from '@/app/components/IconPicker';
 
 interface SelectCellProps {
   checked: boolean;
@@ -86,25 +91,54 @@ export function TitleCell({ title, onChange }: TitleCellProps) {
 interface ProjectCellProps {
   project?: string;
   projects: Project[];
+  onChange?: (projectId: string | undefined) => void;
 }
 
-export function ProjectCell({ project, projects }: ProjectCellProps) {
-  if (!project) return <span className="text-xs text-muted-foreground">—</span>;
+export function ProjectCell({ project, projects, onChange }: ProjectCellProps) {
+  const proj = projects.find(p => p.id === project) ?? projects.find(p => p.name === project);
+  const color = proj?.metadata?.color;
 
-  const proj = projects.find(p => p.id === project);
-  if (!proj) return null;
-
-  const color = proj.metadata?.color;
-
-  return (
+  const trigger = proj ? (
     <Badge
       variant="secondary"
-      className="max-w-[140px] truncate text-[11px] font-medium"
+      className="max-w-full truncate text-[11px] font-medium cursor-pointer"
       style={color ? { backgroundColor: `${color}20`, color, borderColor: `${color}40` } : undefined}
     >
-      {proj.metadata?.icon && <span className="mr-1">{proj.metadata.icon}</span>}
+      {proj.metadata?.icon && (() => { const Icon = getIconComponent(proj.metadata!.icon); return <Icon className="mr-1 h-3 w-3 shrink-0" />; })()}
       {proj.name}
     </Badge>
+  ) : (
+    <span className={cn(
+      'text-xs px-1.5 py-0.5 rounded',
+      onChange
+        ? 'text-muted-foreground/30 hover:text-muted-foreground/60 hover:bg-accent/50 cursor-pointer transition-colors'
+        : 'text-muted-foreground/30'
+    )}>
+      —
+    </span>
+  );
+
+  if (!onChange) return trigger;
+
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <button className="min-w-0 max-w-full focus:outline-none focus-visible:ring-1 focus-visible:ring-ring rounded-md">
+          {trigger}
+        </button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="start" className="w-44">
+        <DropdownMenuItem onClick={() => onChange(undefined)}>
+          <span className="text-muted-foreground">No project</span>
+        </DropdownMenuItem>
+        <DropdownMenuSeparator />
+        {projects.map(p => (
+          <DropdownMenuItem key={p.id} onClick={() => onChange(p.id)}>
+            {p.name}
+          </DropdownMenuItem>
+        ))}
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }
 
@@ -130,19 +164,25 @@ export function DueDateCell({ date, onChange }: DueDateCellProps) {
         <button
           onClick={(e) => e.stopPropagation()}
           className={cn(
-            'flex items-center gap-1.5 rounded-md px-2 py-1 text-xs transition-colors hover:bg-accent',
-            overdue && 'text-red-500',
-            today && 'text-amber-500',
-            !overdue && !today && 'text-muted-foreground'
+            'flex items-center gap-1.5 rounded-md px-2 py-1 text-xs transition-colors',
+            label
+              ? cn('hover:bg-accent', overdue && 'text-red-500', today && 'text-amber-500', !overdue && !today && 'text-muted-foreground')
+              : 'text-muted-foreground/30 hover:text-muted-foreground/60 hover:bg-accent/50'
           )}
         >
-          <Calendar className="h-3 w-3" />
-          {label ?? <span className="italic">No date</span>}
+          {label ? (
+            <>
+              <CalendarIcon className="h-3 w-3" />
+              {label}
+            </>
+          ) : (
+            <span>—</span>
+          )}
         </button>
       </PopoverTrigger>
       <PopoverContent className="w-auto p-0" align="start" onClick={(e) => e.stopPropagation()}>
-        <div className="p-2">
-          <DayPicker
+        <div>
+          <Calendar
             mode="single"
             selected={parsed}
             onSelect={(day) => {
@@ -151,7 +191,6 @@ export function DueDateCell({ date, onChange }: DueDateCellProps) {
                 setOpen(false);
               }
             }}
-            className="text-sm"
           />
           {date && (
             <div className="border-t px-2 pb-2 pt-1">

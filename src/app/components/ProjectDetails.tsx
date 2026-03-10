@@ -3,22 +3,42 @@
 import { useState, useCallback, useMemo, useRef } from 'react';
 import { cn } from '@/app/lib/utils';
 import { Button } from '@/app/components/ui/button';
-import { Textarea } from '@/app/components/ui/textarea';
 import { ScrollArea } from '@/app/components/ui/scroll-area';
 import { AnimatePresence, motion } from 'motion/react';
 import {
-  Plus, AlertTriangle, FileText, CalendarRange, Paperclip,
+  Plus, CalendarRange, Paperclip, Settings2,
+  FileText, Link2, Users, Search as SearchIcon,
+  MoreHorizontal, Pencil, Trash2, ExternalLink, Pin,
 } from 'lucide-react';
 import { toast } from 'sonner';
-import type { Task, Project, StatusConfig, Resource, BlockerItem } from '@/app/types';
+import { format, parseISO } from 'date-fns';
+import {
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem,
+  DropdownMenuTrigger, DropdownMenuSeparator,
+} from '@/app/components/ui/dropdown-menu';
+import { Checkbox } from '@/app/components/ui/checkbox';
+import type { Task, Project, StatusConfig, Resource, ResourceType } from '@/app/types';
 import { IconPicker, getIconComponent } from '@/app/components/IconPicker';
 import { TaskBoard } from '@/app/components/TaskBoard';
 import { ResourceItem } from '@/app/components/ResourceItem';
-import { ChecklistSection } from '@/app/components/ChecklistSection';
 import { DocumentResourceDrawer } from '@/app/components/DocumentResourceDrawer';
-import { format, parseISO } from 'date-fns';
+import { ProjectDetailsDrawer } from '@/app/components/ProjectDetailsDrawer';
 
-type TabId = 'tasks' | 'resources' | 'details';
+const RES_TYPE_ICONS: Record<ResourceType, React.ElementType> = {
+  'Project Note': FileText,
+  Link: Link2,
+  Research: SearchIcon,
+  'Meeting Note': Users,
+};
+
+const RES_TYPE_COLORS: Record<ResourceType, string> = {
+  'Project Note': 'text-blue-400',
+  Link: 'text-emerald-400',
+  Research: 'text-amber-400',
+  'Meeting Note': 'text-violet-400',
+};
+
+type TabId = 'tasks' | 'resources';
 
 interface ProjectDetailsProps {
   project: Project;
@@ -28,6 +48,7 @@ interface ProjectDetailsProps {
   resources: Resource[];
   onProjectUpdate: (id: string, updates: Partial<Project>) => void;
   onTaskCreate: (task: Partial<Task>) => void;
+  onNewTask?: () => void;
   onTaskUpdate: (id: string, updates: Partial<Task>) => void;
   onTaskDelete: (id: string) => void;
   onTaskClick: (task: Task) => void;
@@ -35,6 +56,7 @@ interface ProjectDetailsProps {
   onResourceCreate: (resource: Partial<Resource>) => void;
   onResourceUpdate: (id: string, updates: Partial<Resource>) => void;
   onResourceDelete: (id: string) => void;
+  onCreateNote?: (task: Task) => void;
 }
 
 function formatDate(iso?: string) {
@@ -50,6 +72,7 @@ export function ProjectDetails({
   resources,
   onProjectUpdate,
   onTaskCreate,
+  onNewTask,
   onTaskUpdate,
   onTaskDelete,
   onTaskClick,
@@ -57,9 +80,11 @@ export function ProjectDetails({
   onResourceCreate,
   onResourceUpdate,
   onResourceDelete,
+  onCreateNote,
 }: ProjectDetailsProps) {
   const [activeTab, setActiveTab] = useState<TabId>('tasks');
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [detailsDrawerOpen, setDetailsDrawerOpen] = useState(false);
   const [editingResource, setEditingResource] = useState<Resource | undefined>();
   const nameRef = useRef<HTMLInputElement>(null);
 
@@ -70,23 +95,9 @@ export function ProjectDetails({
     [resources, project.id, project.name],
   );
 
-  const blockers: BlockerItem[] = useMemo(
-    () => project.metadata?.blockers || [],
-    [project.metadata?.blockers],
-  );
-
-  const activeBlockers = blockers.filter((b) => !b.completed).length;
-
   const handleIconChange = useCallback(
     (icon: string, color: string) => {
       onProjectUpdate(project.id, { metadata: { ...project.metadata, icon, color } });
-    },
-    [project, onProjectUpdate],
-  );
-
-  const updateBlockers = useCallback(
-    (updated: BlockerItem[]) => {
-      onProjectUpdate(project.id, { metadata: { ...project.metadata, blockers: updated } });
     },
     [project, onProjectUpdate],
   );
@@ -113,7 +124,6 @@ export function ProjectDetails({
   const TABS: { id: TabId; label: string; count?: number }[] = [
     { id: 'tasks', label: 'Tasks', count: tasks.length },
     { id: 'resources', label: 'Resources', count: projectResources.length || undefined },
-    { id: 'details', label: 'Details' },
   ];
 
   return (
@@ -130,6 +140,7 @@ export function ProjectDetails({
           </div>
 
           <div className="min-w-0 flex-1">
+
             {/* Editable project name */}
             <input
               ref={nameRef}
@@ -163,9 +174,21 @@ export function ProjectDetails({
               }}
             />
 
-            {/* Timeline */}
+          </div>
+
+          {/* Edit details button + date range stacked on the right */}
+          <div className="flex shrink-0 flex-col items-end gap-1.5">
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-7 gap-1.5 text-xs"
+              onClick={() => setDetailsDrawerOpen(true)}
+            >
+              <Settings2 className="h-3 w-3" />
+              Edit details
+            </Button>
             {(project.metadata?.start_date || project.metadata?.end_date) && (
-              <div className="mt-1.5 flex items-center gap-1.5 text-xs text-muted-foreground">
+              <div className="flex items-center gap-1 text-xs text-muted-foreground">
                 <CalendarRange className="h-3 w-3 shrink-0" />
                 <span>
                   {formatDate(project.metadata.start_date) ?? '—'}
@@ -220,10 +243,12 @@ export function ProjectDetails({
             projects={projects}
             statuses={statuses}
             onTaskCreate={onTaskCreate}
+            onNewTask={onNewTask}
             onTaskUpdate={onTaskUpdate}
             onTaskDelete={onTaskDelete}
             onTaskClick={onTaskClick}
             onStatusesChange={onStatusesChange}
+            onCreateNote={onCreateNote}
             projectFilter={project.name}
             defaultView="list"
           />
@@ -231,151 +256,135 @@ export function ProjectDetails({
 
         {/* Resources tab */}
         {activeTab === 'resources' && (
-          <ScrollArea className="h-full">
-            <div className="p-6">
-              <div className="mb-4 flex items-center justify-between">
-                <p className="text-sm text-muted-foreground">
-                  {projectResources.length === 0
-                    ? 'No resources yet'
-                    : `${projectResources.length} resource${projectResources.length === 1 ? '' : 's'}`}
-                </p>
+          <div className="flex flex-col h-full">
+            {/* Resource header */}
+            <div className="flex items-center justify-between px-6 py-3 border-b border-border/30">
+              <p className="text-xs text-muted-foreground">
+                {projectResources.length === 0
+                  ? 'No resources yet'
+                  : `${projectResources.length} resource${projectResources.length === 1 ? '' : 's'}`}
+              </p>
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-7 gap-1.5 text-xs"
+                onClick={() => { setEditingResource(undefined); setDrawerOpen(true); }}
+              >
+                <Plus className="h-3 w-3" />
+                Add Resource
+              </Button>
+            </div>
+
+            {projectResources.length === 0 ? (
+              <div className="flex flex-col items-center justify-center gap-3 py-16 text-muted-foreground">
+                <Paperclip className="h-8 w-8 opacity-30" />
+                <p className="text-sm">Attach notes, links, and docs to this project</p>
                 <Button
                   variant="outline"
                   size="sm"
-                  className="h-7 gap-1.5 text-xs"
                   onClick={() => { setEditingResource(undefined); setDrawerOpen(true); }}
                 >
-                  <Plus className="h-3 w-3" />
-                  Add Resource
+                  <Plus className="mr-1.5 h-3.5 w-3.5" />
+                  Add first resource
                 </Button>
               </div>
-
-              {projectResources.length === 0 ? (
-                <div className="flex flex-col items-center justify-center gap-3 py-16 text-muted-foreground">
-                  <Paperclip className="h-8 w-8 opacity-30" />
-                  <p className="text-sm">Attach notes, links, and docs to this project</p>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => { setEditingResource(undefined); setDrawerOpen(true); }}
+            ) : (
+              <ScrollArea className="flex-1">
+                <div className="min-w-[500px]">
+                  {/* Column header */}
+                  <div
+                    style={{ gridTemplateColumns: '1fr 120px 120px 40px' }}
+                    className="grid items-center border-b border-border/40 bg-muted/30 py-1.5 text-xs font-medium text-muted-foreground select-none"
                   >
-                    <Plus className="mr-1.5 h-3.5 w-3.5" />
-                    Add first resource
-                  </Button>
-                </div>
-              ) : (
-                <div className="space-y-2">
-                  <AnimatePresence initial={false}>
-                    {projectResources.map((resource) => (
-                      <motion.div
+                    <div className="px-6">Title</div>
+                    <div className="px-2">Type</div>
+                    <div className="px-2">Date</div>
+                    <div />
+                  </div>
+
+                  {/* Rows */}
+                  {projectResources.map((resource) => {
+                    const TypeIcon = RES_TYPE_ICONS[resource.type] || FileText;
+                    const typeColor = RES_TYPE_COLORS[resource.type] || 'text-muted-foreground';
+
+                    return (
+                      <div
                         key={resource.id}
-                        layout
-                        initial={{ opacity: 0, y: 4 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, height: 0 }}
-                        transition={{ duration: 0.12 }}
+                        style={{ gridTemplateColumns: '1fr 120px 120px 40px' }}
+                        className="grid items-center border-b border-border/30 py-2 text-sm transition-colors hover:bg-accent/30"
                       >
-                        <ResourceItem
-                          resource={resource}
-                          variant="card"
-                          onEdit={handleResourceEdit}
-                          onDelete={(id) => { onResourceDelete(id); toast.success('Deleted'); }}
-                        />
-                      </motion.div>
-                    ))}
-                  </AnimatePresence>
+                        {/* Title */}
+                        <button
+                          className="flex items-center gap-2 px-6 text-left min-w-0"
+                          onClick={() => handleResourceEdit(resource)}
+                        >
+                          {resource.pinned && (
+                            <Pin className="h-3 w-3 text-primary/50 shrink-0" />
+                          )}
+                          <span className="text-xs font-medium text-foreground truncate">
+                            {resource.title || 'Untitled'}
+                          </span>
+                          {resource.url && (
+                            <ExternalLink className="h-3 w-3 text-muted-foreground/30 shrink-0" />
+                          )}
+                        </button>
+
+                        {/* Type */}
+                        <div className="flex items-center gap-1.5 px-2">
+                          <TypeIcon className={cn('h-3 w-3 shrink-0', typeColor)} />
+                          <span className="text-[11px] text-muted-foreground truncate">
+                            {resource.type}
+                          </span>
+                        </div>
+
+                        {/* Date */}
+                        <div className="px-2">
+                          <span className="text-[11px] text-muted-foreground/50">
+                            {format(new Date(resource.createdAt), 'MMM d, yyyy')}
+                          </span>
+                        </div>
+
+                        {/* Actions */}
+                        <div className="flex items-center justify-center">
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <button className="p-1 rounded text-muted-foreground/30 hover:text-muted-foreground transition-colors">
+                                <MoreHorizontal className="h-3.5 w-3.5" />
+                              </button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end" className="w-36">
+                              <DropdownMenuItem onClick={() => handleResourceEdit(resource)}>
+                                <Pencil className="mr-2 h-3.5 w-3.5" />
+                                Edit
+                              </DropdownMenuItem>
+                              {resource.url && (
+                                <DropdownMenuItem
+                                  onClick={() => window.open(resource.url, '_blank')}
+                                >
+                                  <ExternalLink className="mr-2 h-3.5 w-3.5" />
+                                  Open Link
+                                </DropdownMenuItem>
+                              )}
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem
+                                className="text-destructive"
+                                onClick={() => { onResourceDelete(resource.id); toast.success('Deleted'); }}
+                              >
+                                <Trash2 className="mr-2 h-3.5 w-3.5" />
+                                Delete
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
-              )}
-            </div>
-          </ScrollArea>
+              </ScrollArea>
+            )}
+          </div>
         )}
 
-        {/* Details tab */}
-        {activeTab === 'details' && (
-          <ScrollArea className="h-full">
-            <div className="mx-auto max-w-xl space-y-8 p-6">
-
-              {/* Description */}
-              <div>
-                <label className="mb-2 block text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                  Description
-                </label>
-                <Textarea
-                  defaultValue={project.description || ''}
-                  onBlur={(e) => {
-                    const v = e.target.value;
-                    if (v !== (project.description || ''))
-                      onProjectUpdate(project.id, { description: v });
-                  }}
-                  placeholder="What is this project about?"
-                  className="min-h-[100px] resize-none text-sm"
-                />
-              </div>
-
-              {/* Timeline */}
-              <div>
-                <label className="mb-2 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                  <CalendarRange className="h-3.5 w-3.5" />
-                  Timeline
-                </label>
-                <div className="flex items-center gap-3">
-                  <div className="flex-1">
-                    <p className="mb-1 text-xs text-muted-foreground">Start</p>
-                    <input
-                      type="date"
-                      value={project.metadata?.start_date || ''}
-                      onChange={(e) =>
-                        onProjectUpdate(project.id, {
-                          metadata: { ...project.metadata, start_date: e.target.value || undefined },
-                        })
-                      }
-                      className="w-full rounded-md border border-border bg-transparent px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
-                    />
-                  </div>
-                  <span className="mt-5 text-muted-foreground">→</span>
-                  <div className="flex-1">
-                    <p className="mb-1 text-xs text-muted-foreground">End</p>
-                    <input
-                      type="date"
-                      value={project.metadata?.end_date || ''}
-                      onChange={(e) =>
-                        onProjectUpdate(project.id, {
-                          metadata: { ...project.metadata, end_date: e.target.value || undefined },
-                        })
-                      }
-                      className="w-full rounded-md border border-border bg-transparent px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
-                    />
-                  </div>
-                </div>
-              </div>
-
-              {/* Blockers */}
-              <div>
-                <label className="mb-2 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                  <AlertTriangle className="h-3.5 w-3.5" />
-                  Blockers
-                  {activeBlockers > 0 && (
-                    <span className="ml-1 rounded-full bg-destructive/15 px-1.5 py-0.5 text-[10px] font-semibold text-destructive">
-                      {activeBlockers}
-                    </span>
-                  )}
-                </label>
-                <ChecklistSection
-                  items={blockers}
-                  onToggle={(id) =>
-                    updateBlockers(blockers.map((b) => b.id === id ? { ...b, completed: !b.completed } : b))
-                  }
-                  onDelete={(id) => updateBlockers(blockers.filter((b) => b.id !== id))}
-                  onAdd={(title) =>
-                    updateBlockers([...blockers, { id: crypto.randomUUID(), title, completed: false }])
-                  }
-                  placeholder="Add blocker… press Enter"
-                  emptyMessage="No blockers — looking good!"
-                />
-              </div>
-            </div>
-          </ScrollArea>
-        )}
       </div>
 
       <DocumentResourceDrawer
@@ -384,6 +393,13 @@ export function ProjectDetails({
         resource={editingResource}
         projects={projects}
         onSave={handleResourceSave}
+      />
+
+      <ProjectDetailsDrawer
+        open={detailsDrawerOpen}
+        onOpenChange={setDetailsDrawerOpen}
+        project={project}
+        onProjectUpdate={onProjectUpdate}
       />
     </div>
   );

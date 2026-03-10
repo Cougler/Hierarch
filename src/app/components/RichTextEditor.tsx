@@ -98,7 +98,7 @@ export function RichTextEditor({
 
   useEffect(() => {
     if (editor && editor.getHTML() !== content) {
-      editor.commands.setContent(content, false);
+      editor.commands.setContent(content, false as unknown as undefined);
     }
   }, [content, editor]);
 

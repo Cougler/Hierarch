@@ -1,3 +1,13 @@
+export interface PhaseTransition {
+  id: string;
+  fromPhase: string;
+  toPhase: string;
+  timestamp: string;
+  reviewer?: string;
+  deadline?: string;
+  notes?: string;
+}
+
 export interface Task {
   id: string;
   title: string;
@@ -9,11 +19,13 @@ export interface Task {
   order: number;
   project?: string;
   waitingFor?: WaitingForItem[];
+  phaseHistory?: PhaseTransition[];
   blocker?: string;
   decisionNeeded?: boolean;
   decisionDetails?: string;
   dependency?: string;
   artifact?: string;
+  createdAt?: string;
 }
 
 export interface WaitingForItem {
@@ -44,6 +56,8 @@ export interface Project {
   name: string;
   description?: string;
   metadata?: ProjectMetadata;
+  start_date?: string; // ISO date string (YYYY-MM-DD)
+  end_date?: string;   // ISO date string (YYYY-MM-DD)
   created_at: string;
   owner_id?: string;
 }
@@ -74,6 +88,7 @@ export interface StatusConfig {
   width: number;
   visible?: boolean;
   isDone?: boolean;
+  isFeedback?: boolean;
 }
 
 export interface TimeEntry {
@@ -86,10 +101,19 @@ export interface TimeEntry {
 }
 
 export const DEFAULT_STATUSES: StatusConfig[] = [
-  { id: 'backlog', title: 'Backlog', color: 'bg-slate-500', countColor: 'text-slate-400', order: 0, width: 280, visible: true },
-  { id: 'in-progress', title: 'In Progress', color: 'bg-blue-500', countColor: 'text-blue-400', order: 1, width: 280, visible: true },
-  { id: 'review', title: 'Review', color: 'bg-amber-500', countColor: 'text-amber-400', order: 2, width: 280, visible: true },
-  { id: 'done', title: 'Done', color: 'bg-emerald-500', countColor: 'text-emerald-400', order: 3, width: 280, visible: true, isDone: true },
+  { id: 'explore', title: 'Explore', color: 'bg-violet-500', countColor: 'text-violet-400', order: 0, width: 280, visible: true },
+  { id: 'define', title: 'Define', color: 'bg-blue-500', countColor: 'text-blue-400', order: 1, width: 280, visible: true },
+  { id: 'refine', title: 'Refine', color: 'bg-amber-500', countColor: 'text-amber-400', order: 2, width: 280, visible: true },
+  { id: 'feedback', title: 'Feedback', color: 'bg-orange-500', countColor: 'text-orange-400', order: 3, width: 280, visible: true, isFeedback: true },
+  { id: 'handoff', title: 'Handoff', color: 'bg-emerald-500', countColor: 'text-emerald-400', order: 4, width: 280, visible: true, isDone: true },
 ];
+
+// Maps old engineering statuses to design phases for migration
+export const LEGACY_STATUS_MAP: Record<string, string> = {
+  'backlog': 'explore',
+  'in-progress': 'refine',
+  'review': 'feedback',
+  'done': 'handoff',
+};
 
 export type Attachment = Resource; // backward compat alias

@@ -1,4 +1,4 @@
--- Flowki Database Schema
+-- Hierarch Database Schema
 -- Run this in your Supabase SQL Editor
 
 -- 1. Projects Table

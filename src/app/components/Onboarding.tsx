@@ -3,11 +3,10 @@ import { motion, AnimatePresence } from 'motion/react';
 
 import {
   FolderKanban,
-  CheckSquare,
-  FileBox,
-  Timer,
-  Columns3,
-  Package,
+  StickyNote,
+  Compass,
+  ArrowRight,
+  Layers,
   Rocket,
   ChevronLeft,
   ChevronRight,
@@ -28,16 +27,16 @@ interface Step {
 }
 
 const ICON_CARD_CLASSES =
-  'flex flex-col items-center gap-3 rounded-2xl border border-white/10 bg-white/5 p-6 text-center backdrop-blur-sm';
+  'flex flex-col items-center gap-3 rounded-2xl border border-border bg-secondary/50 p-6 text-center backdrop-blur-sm';
 
 function IconCard({ icon: Icon, label, description }: { icon: React.ElementType; label: string; description: string }) {
   return (
     <div className={ICON_CARD_CLASSES}>
-      <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-teal-500/10">
-        <Icon className="h-6 w-6 text-teal-400" />
+      <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10">
+        <Icon className="h-6 w-6 text-primary" />
       </div>
-      <h4 className="font-semibold text-white">{label}</h4>
-      <p className="text-sm leading-relaxed text-gray-400">{description}</p>
+      <h4 className="font-semibold text-foreground">{label}</h4>
+      <p className="text-sm leading-relaxed text-muted-foreground">{description}</p>
     </div>
   );
 }
@@ -45,76 +44,78 @@ function IconCard({ icon: Icon, label, description }: { icon: React.ElementType;
 const steps: Step[] = [
   {
     title: 'Welcome to Hierarch',
-    subtitle: 'Your all-in-one workspace for getting things done.',
+    subtitle: 'A design workspace that thinks the way you work.',
     content: (
       <div className="flex flex-col items-center gap-6">
-        <div className="flex h-20 w-20 items-center justify-center rounded-2xl bg-gradient-to-br from-teal-500/20 to-cyan-500/20">
+        <div className="flex h-20 w-20 items-center justify-center rounded-2xl bg-primary/15">
           <img src="/logo.svg" className="h-10 w-10" alt="Hierarch" />
         </div>
-        <p className="max-w-md text-center leading-relaxed text-gray-300">
-          Hierarch helps you organize projects, track tasks, manage resources, and stay focused
-          — all in one beautiful interface.
+        <p className="max-w-md text-center leading-relaxed text-muted-foreground">
+          Hierarch organizes your design projects around nonlinear phases — explore, define, refine, get feedback, and hand off — instead of a rigid status pipeline.
         </p>
       </div>
     ),
   },
   {
-    title: 'How It Works',
-    subtitle: 'Three pillars that keep your work organized.',
+    title: 'Projects, Tasks & Notes',
+    subtitle: 'Everything lives together.',
     content: (
       <div className="grid gap-4 sm:grid-cols-3">
         <IconCard
           icon={FolderKanban}
           label="Projects"
-          description="Group related work into projects with their own boards and timelines."
+          description="Group your work by client or initiative. Each project has its own board, resources, and timeline."
         />
         <IconCard
-          icon={CheckSquare}
+          icon={Layers}
           label="Tasks"
-          description="Break work into actionable tasks with priorities, labels, and due dates."
+          description="Tasks move through design phases — not just 'to-do' and 'done.' View them as a board or a list."
         />
         <IconCard
-          icon={FileBox}
-          label="Resources"
-          description="Attach files, links, and notes to keep everything in context."
+          icon={StickyNote}
+          label="Design Notes"
+          description="Capture decisions, feedback, and research. Notes attach to projects and show up in your activity feed."
         />
       </div>
     ),
   },
   {
-    title: 'Key Features',
-    subtitle: 'Powerful tools to boost your productivity.',
-    content: (
-      <div className="grid gap-4 sm:grid-cols-3">
-        <IconCard
-          icon={Timer}
-          label="Focus Timer"
-          description="Built-in Pomodoro timer to help you stay in flow and track time spent."
-        />
-        <IconCard
-          icon={Columns3}
-          label="Kanban Board"
-          description="Drag-and-drop cards across columns to visualize your workflow."
-        />
-        <IconCard
-          icon={Package}
-          label="Resource Hub"
-          description="Centralized storage for all your project assets and references."
-        />
-      </div>
-    ),
-  },
-  {
-    title: 'Ready to Go!',
-    subtitle: "You're all set. Let's build something great.",
+    title: 'Your Overview',
+    subtitle: 'Start each day with clarity.',
     content: (
       <div className="flex flex-col items-center gap-6">
-        <div className="flex h-20 w-20 items-center justify-center rounded-2xl bg-gradient-to-br from-teal-500/20 to-cyan-500/20">
-          <Rocket className="h-10 w-10 text-teal-400" />
+        <div className="flex h-20 w-20 items-center justify-center rounded-2xl bg-primary/15">
+          <Compass className="h-10 w-10 text-primary" />
         </div>
-        <p className="max-w-md text-center leading-relaxed text-gray-300">
-          Your workspace is ready. Create your first project, invite teammates, and start
-          shipping faster than ever.
+        <div className="max-w-md space-y-3 text-center text-sm leading-relaxed text-muted-foreground">
+          <p>
+            The <strong className="text-foreground">Overview</strong> page shows your active projects, what needs attention, and recent progress — phase changes, new tasks, notes, and more.
+          </p>
+          <div className="flex items-center justify-center gap-2 text-xs text-muted-foreground/80">
+            <span className="rounded bg-violet-500/20 px-1.5 py-0.5 text-violet-400">Explore</span>
+            <ArrowRight className="h-3 w-3" />
+            <span className="rounded bg-blue-500/20 px-1.5 py-0.5 text-blue-400">Define</span>
+            <ArrowRight className="h-3 w-3" />
+            <span className="rounded bg-amber-500/20 px-1.5 py-0.5 text-amber-400">Refine</span>
+            <ArrowRight className="h-3 w-3" />
+            <span className="rounded bg-orange-500/20 px-1.5 py-0.5 text-orange-400">Feedback</span>
+            <ArrowRight className="h-3 w-3" />
+            <span className="rounded bg-emerald-500/20 px-1.5 py-0.5 text-emerald-400">Handoff</span>
+          </div>
+        </div>
+      </div>
+    ),
+  },
+  {
+    title: 'Ready to Go',
+    subtitle: "You're all set.",
+    content: (
+      <div className="flex flex-col items-center gap-6">
+        <div className="flex h-20 w-20 items-center justify-center rounded-2xl bg-primary/15">
+          <Rocket className="h-10 w-10 text-primary" />
+        </div>
+        <p className="max-w-md text-center leading-relaxed text-muted-foreground">
+          Create your first project, add some tasks, and start moving work through your design phases.
         </p>
       </div>
     ),
@@ -149,10 +150,10 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
   };
 
   return (
-    <div className="relative flex min-h-screen flex-col items-center justify-center overflow-hidden bg-gray-950 px-4 py-12">
+    <div className="relative flex min-h-screen flex-col items-center justify-center overflow-hidden bg-background px-4 py-12">
       <div className="pointer-events-none absolute inset-0 overflow-hidden">
-        <div className="absolute -left-40 -top-40 h-[500px] w-[500px] rounded-full bg-teal-500/8 blur-[120px]" />
-        <div className="absolute -bottom-40 -right-40 h-[500px] w-[500px] rounded-full bg-cyan-500/8 blur-[120px]" />
+        <div className="absolute -left-40 -top-40 h-[500px] w-[500px] rounded-full bg-primary/[0.06] blur-[120px]" />
+        <div className="absolute -bottom-40 -right-40 h-[500px] w-[500px] rounded-full bg-primary/[0.04] blur-[120px]" />
       </div>
 
       <div className="relative z-10 flex w-full max-w-2xl flex-col items-center gap-10">
@@ -160,7 +161,7 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
         {!isLast && (
           <button
             onClick={handleComplete}
-            className="absolute right-0 top-0 text-sm text-gray-500 transition-colors hover:text-gray-300"
+            className="absolute right-0 top-0 text-sm text-muted-foreground transition-colors hover:text-foreground"
           >
             Skip
           </button>
@@ -179,10 +180,10 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
             className="flex w-full flex-col items-center gap-8"
           >
             <div className="text-center">
-              <h2 className="text-3xl font-bold text-white">{steps[currentStep].title}</h2>
-              <p className="mt-2 text-gray-400">{steps[currentStep].subtitle}</p>
+              <h2 className="text-3xl font-bold text-foreground">{steps[currentStep]?.title}</h2>
+              <p className="mt-2 text-muted-foreground">{steps[currentStep]?.subtitle}</p>
             </div>
-            {steps[currentStep].content}
+            {steps[currentStep]?.content}
           </motion.div>
         </AnimatePresence>
 
@@ -192,7 +193,7 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
             variant="ghost"
             onClick={() => goTo(currentStep - 1)}
             disabled={isFirst}
-            className={cn('text-gray-400 hover:text-white', isFirst && 'invisible')}
+            className={cn('text-muted-foreground hover:text-foreground', isFirst && 'invisible')}
           >
             <ChevronLeft className="mr-1 h-4 w-4" />
             Back
@@ -206,7 +207,7 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
                 onClick={() => goTo(i)}
                 className={cn(
                   'h-2 rounded-full transition-all duration-300',
-                  i === currentStep ? 'w-6 bg-teal-400' : 'w-2 bg-gray-600 hover:bg-gray-500'
+                  i === currentStep ? 'w-6 bg-primary' : 'w-2 bg-border hover:bg-muted-foreground'
                 )}
               />
             ))}
@@ -215,7 +216,7 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
           {isLast ? (
             <Button
               onClick={handleComplete}
-              className="bg-teal-500 text-white hover:bg-teal-600"
+              className="bg-primary text-primary-foreground hover:bg-primary/90"
             >
               Get Started
               <Rocket className="ml-1 h-4 w-4" />
@@ -224,7 +225,7 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
             <Button
               variant="ghost"
               onClick={() => goTo(currentStep + 1)}
-              className="text-gray-400 hover:text-white"
+              className="text-muted-foreground hover:text-foreground"
             >
               Next
               <ChevronRight className="ml-1 h-4 w-4" />

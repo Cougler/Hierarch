@@ -2,6 +2,7 @@ import { supabase } from '../supabase-client';
 import type {
   Task,
   WaitingForItem,
+  PhaseTransition,
   Resource,
   ResourceType,
   Project,
@@ -11,16 +12,17 @@ import type {
 const isValidUUID = (id: string) =>
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
 
-function parseTaskDescription(raw: string | null): { content: string; waitingFor: WaitingForItem[] } {
-  if (!raw) return { content: '', waitingFor: [] };
+function parseTaskDescription(raw: string | null): { content: string; waitingFor: WaitingForItem[]; phaseHistory: PhaseTransition[] } {
+  if (!raw) return { content: '', waitingFor: [], phaseHistory: [] };
   try {
-    const parsed = JSON.parse(raw) as { content?: string; waitingFor?: WaitingForItem[] };
+    const parsed = JSON.parse(raw) as { content?: string; waitingFor?: WaitingForItem[]; phaseHistory?: PhaseTransition[] };
     return {
       content: parsed.content ?? '',
       waitingFor: Array.isArray(parsed.waitingFor) ? parsed.waitingFor : [],
+      phaseHistory: Array.isArray(parsed.phaseHistory) ? parsed.phaseHistory : [],
     };
   } catch {
-    return { content: raw, waitingFor: [] };
+    return { content: raw, waitingFor: [], phaseHistory: [] };
   }
 }
 
@@ -75,7 +77,9 @@ export async function getProjects(): Promise<Project[] | null> {
 
 export async function createProject(
   name: string,
-  metadata?: ProjectMetadata
+  metadata?: ProjectMetadata,
+  startDate?: string,
+  endDate?: string
 ): Promise<Project | null> {
   try {
     const ownerId = await getOwnerId();
@@ -84,6 +88,8 @@ export async function createProject(
       .insert({
         name,
         metadata: metadata ?? {},
+        start_date: startDate ?? null,
+        end_date: endDate ?? null,
         owner_id: ownerId,
       })
       .select()
@@ -101,7 +107,7 @@ export async function createProject(
 
 export async function updateProject(
   id: string,
-  updates: Partial<Pick<Project, 'name' | 'description' | 'metadata'>>
+  updates: Partial<Pick<Project, 'name' | 'description' | 'metadata' | 'start_date' | 'end_date'>>
 ): Promise<Project | null> {
   try {
     const { data, error } = await supabase
@@ -136,23 +142,25 @@ export async function deleteProject(id: string): Promise<boolean> {
 }
 
 function mapDbTaskToTask(row: Record<string, unknown>): Task {
-  const { content, waitingFor } = parseTaskDescription(row.description as string | null);
+  const { content, waitingFor, phaseHistory } = parseTaskDescription(row.description as string | null);
   return {
     id: row.id as string,
     title: (row.title as string) ?? '',
     description: content,
-    status: (row.status as string) ?? 'backlog',
+    status: ((row.status as string) ?? 'explore').toLowerCase(),
     tags: Array.isArray(row.tags) ? (row.tags as string[]) : [],
     dueDate: (row.due_at as string) ?? '',
     assignees: Array.isArray(row.assignees) ? (row.assignees as string[]) : [],
     order: typeof row.position === 'number' ? row.position : 0,
     project: row.project_id as string | undefined,
     waitingFor: waitingFor.length > 0 ? waitingFor : undefined,
+    phaseHistory: phaseHistory.length > 0 ? phaseHistory : undefined,
     blocker: row.blocker as string | undefined,
     decisionNeeded: row.decision_needed as boolean | undefined,
     decisionDetails: row.decision_details as string | undefined,
     dependency: row.dependency as string | undefined,
     artifact: row.artifact as string | undefined,
+    createdAt: (row.created_at as string) ?? undefined,
   };
 }
 
@@ -185,11 +193,12 @@ export async function createTask(
     const descriptionJson = JSON.stringify({
       content: task.description ?? '',
       waitingFor: task.waitingFor ?? [],
+      phaseHistory: task.phaseHistory ?? [],
     });
     const insert: Record<string, unknown> = {
       title: task.title,
       description: descriptionJson,
-      status: task.status ?? 'backlog',
+      status: task.status ?? 'explore',
       tags: task.tags ?? [],
       due_at: task.dueDate || null,
       assignees: task.assignees ?? [],
@@ -232,12 +241,14 @@ export async function updateTask(
       console.error('updateTask fetch error:', fetchError);
       return null;
     }
-    const { content, waitingFor } = parseTaskDescription(current.description as string | null);
+    const { content, waitingFor, phaseHistory } = parseTaskDescription(current.description as string | null);
     const mergedContent = updates.description !== undefined ? updates.description : content;
     const mergedWaitingFor = updates.waitingFor ?? waitingFor;
+    const mergedPhaseHistory = updates.phaseHistory ?? phaseHistory;
     const descriptionJson = JSON.stringify({
       content: mergedContent,
       waitingFor: mergedWaitingFor,
+      phaseHistory: mergedPhaseHistory,
     });
     const dbUpdates: Record<string, unknown> = {};
     if (updates.title !== undefined) dbUpdates.title = updates.title;

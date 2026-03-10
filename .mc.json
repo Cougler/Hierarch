@@ -1,6 +1,7 @@
 {
   "description": "React task management app with drag-and-drop, focus timer, and today view",
   "status": "active",
-  "stack": ["React", "TypeScript", "Tailwind CSS", "shadcn/ui"],
-  "notes": "The app has been rebranded from Flowki to Hierarch with a new logo (logo.svg used everywhere), domain hierarchical.app, and tagline 'Organization for designers'. The shell UI was overhauled: sidebar and outer frame share #262624 background, main content floats as a rounded card, the task drawer uses Framer Motion for snappy spring animation with a full-height hover-reveal close strip, and task rows now have a colored status dot that opens a status-change dropdown. Today view now uses the same TaskRow component as all other views. Next: auth/persistence wiring or continued UX polish."
+  "stack": ["React", "TypeScript", "Tailwind CSS", "shadcn/ui", "Supabase"],
+  "url": "https://hierarch.vercel.app",
+  "notes": "The Briefing overview page is fully overhauled with glass morphism styling, viewport-contained scrolling, and a project preview drawer that opens inline so users don't navigate away. Design notes are now a full system with a rich-text NoteDrawer (contentEditable with toolbar), note types (Freeform/Decision/Feedback/Research/Critique), and create-note buttons on task rows across all views. The resources tab in projects now uses a table layout matching the main resources page. Next: deploy these changes, build the Insights view, and continue the design cockpit vision."
 }

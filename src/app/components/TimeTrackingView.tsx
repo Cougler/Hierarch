@@ -73,7 +73,7 @@ function groupByDay(entries: TimeEntry[]): GroupedEntries {
   }
 
   return Array.from(groups.entries()).map(([date, items]) => ({
-    label: getDayLabel(items[0].createdAt),
+    label: getDayLabel(items[0]?.createdAt ?? ''),
     date,
     entries: items,
   }));

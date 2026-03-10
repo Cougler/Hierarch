@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo, useCallback, useEffect } from 'react';
+import { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import { cn } from '@/app/lib/utils';
 import { Button } from '@/app/components/ui/button';
 import { Input } from '@/app/components/ui/input';
@@ -18,11 +18,13 @@ import {
 
 import {
   LayoutGrid, List, Plus, Search, SlidersHorizontal, ArrowUpDown,
-  Trash2, Settings2, Columns3, FolderKanban, X, CheckCheck, Circle,
+  ArrowUp, ArrowDown, Trash2, Settings2, Columns3, FolderKanban, X, CheckCheck, Circle,
 } from 'lucide-react';
+import { Checkbox } from '@/app/components/ui/checkbox';
+import { useColumnWidths } from '@/app/hooks/use-column-widths';
 import {
   DndContext, DragOverlay, closestCorners, PointerSensor,
-  useSensor, useSensors,
+  useSensor, useSensors, useDroppable,
 } from '@dnd-kit/core';
 import type { DragStartEvent, DragEndEvent, DragOverEvent } from '@dnd-kit/core';
 import {
@@ -48,6 +50,10 @@ interface TaskBoardProps {
   onTaskDelete: (id: string) => void;
   onTaskClick: (task: Task) => void;
   onStatusesChange: (statuses: StatusConfig[]) => void;
+  onNewTask?: () => void;
+  onStartFocus?: (task: Task) => void;
+  onCreateNote?: (task: Task) => void;
+  focusTaskId?: string | null;
   projectFilter?: string;
   defaultView?: ViewMode;
 }
@@ -61,20 +67,29 @@ export function TaskBoard({
   onTaskDelete,
   onTaskClick,
   onStatusesChange,
+  onNewTask,
+  onStartFocus,
+  onCreateNote,
+  focusTaskId,
   projectFilter,
   defaultView = 'list',
 }: TaskBoardProps) {
   const [view, setView] = useState<ViewMode>(() => {
-    const stored = localStorage.getItem('flowki-task-view') as ViewMode | null;
+    const stored = localStorage.getItem('hierarch-task-view') as ViewMode | null;
     return stored || defaultView;
   });
   const [search, setSearch] = useState('');
   const [sortBy, setSortBy] = useState<SortKey>('status');
-  const [groupByProject, setGroupByProject] = useState(false);
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
+  const [groupBy, setGroupBy] = useState(false);
+  const [filterStatuses, setFilterStatuses] = useState<string[]>([]);
+  const [filterProjects, setFilterProjects] = useState<string[]>([]);
+  const [filterDueDate, setFilterDueDate] = useState<string[]>([]);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [statusManagerOpen, setStatusManagerOpen] = useState(false);
   const [columnManagerOpen, setColumnManagerOpen] = useState(false);
   const [activeId, setActiveId] = useState<string | null>(null);
+  const [inlineCreating, setInlineCreating] = useState(false);
 
   const [listColumns, setListColumns] = useState([
     { id: 'select', title: 'Select', visible: true, width: 40 },
@@ -92,7 +107,8 @@ export function TaskBoard({
     let result = tasks;
 
     if (projectFilter) {
-      result = result.filter(t => t.project === projectFilter);
+      const projId = projects.find(p => p.name === projectFilter || p.id === projectFilter)?.id;
+      result = result.filter(t => t.project === projectFilter || (projId && t.project === projId));
     }
 
     if (search) {
@@ -103,26 +119,54 @@ export function TaskBoard({
       );
     }
 
+    if (filterStatuses.length > 0) {
+      result = result.filter(t => filterStatuses.includes(t.status));
+    }
+
+    if (filterProjects.length > 0) {
+      result = result.filter(t => {
+        const proj = projects.find(p => p.id === t.project || p.name === t.project);
+        return proj ? filterProjects.includes(proj.id) : false;
+      });
+    }
+
+    if (filterDueDate.length > 0) {
+      const today = new Date(); today.setHours(0, 0, 0, 0);
+      result = result.filter(t => {
+        if (filterDueDate.includes('no_date') && !t.dueDate) return true;
+        if (!t.dueDate) return false;
+        const d = new Date(t.dueDate); d.setHours(0, 0, 0, 0);
+        if (filterDueDate.includes('overdue') && d < today) return true;
+        if (filterDueDate.includes('today') && d.getTime() === today.getTime()) return true;
+        if (filterDueDate.includes('this_week')) {
+          const end = new Date(today); end.setDate(today.getDate() + 6);
+          if (d > today && d <= end) return true;
+        }
+        return false;
+      });
+    }
+
     const sorted = [...result];
+    const dir = sortDir === 'asc' ? 1 : -1;
     switch (sortBy) {
       case 'date':
-        sorted.sort((a, b) => (a.dueDate || 'z').localeCompare(b.dueDate || 'z'));
+        sorted.sort((a, b) => dir * (a.dueDate || 'z').localeCompare(b.dueDate || 'z'));
         break;
       case 'status': {
         const orderMap = new Map(statuses.map(s => [s.id, s.order]));
         sorted.sort((a, b) =>
-          (orderMap.get(a.status) ?? 99) - (orderMap.get(b.status) ?? 99) ||
+          dir * ((orderMap.get(a.status) ?? 99) - (orderMap.get(b.status) ?? 99)) ||
           a.order - b.order,
         );
         break;
       }
       case 'project':
-        sorted.sort((a, b) => (a.project || 'z').localeCompare(b.project || 'z'));
+        sorted.sort((a, b) => dir * (a.project || 'z').localeCompare(b.project || 'z'));
         break;
     }
 
     return sorted;
-  }, [tasks, search, sortBy, statuses, projectFilter]);
+  }, [tasks, search, sortBy, sortDir, statuses, projectFilter, filterStatuses, filterProjects, filterDueDate, projects]);
 
   // Group tasks by status for board view
   const tasksByStatus = useMemo(() => {
@@ -136,24 +180,56 @@ export function TaskBoard({
     return map;
   }, [filtered, statuses]);
 
-  // Group tasks by project for list view
-  const tasksByProject = useMemo(() => {
-    if (!groupByProject) return null;
-    const map = new Map<string, Task[]>();
-    filtered.forEach(t => {
-      const key = t.project || '__none__';
-      if (!map.has(key)) map.set(key, []);
-      map.get(key)!.push(t);
-    });
-    return map;
-  }, [filtered, groupByProject]);
+  // Group tasks for list view
+  const taskGroups = useMemo((): { label: string; tasks: Task[] }[] | null => {
+    if (!groupBy) return null;
+
+    if (sortBy === 'status') {
+      const ordered = sortDir === 'asc' ? statuses : [...statuses].reverse();
+      return ordered
+        .map(s => ({ label: s.title, tasks: filtered.filter(t => t.status === s.id) }))
+        .filter(g => g.tasks.length > 0);
+    }
+
+    if (sortBy === 'project') {
+      const map = new Map<string, Task[]>();
+      filtered.forEach(t => {
+        const proj = projects.find(p => p.id === t.project || p.name === t.project);
+        const key = proj?.name ?? 'No Project';
+        if (!map.has(key)) map.set(key, []);
+        map.get(key)!.push(t);
+      });
+      return Array.from(map.entries()).map(([label, tasks]) => ({ label, tasks }));
+    }
+
+    if (sortBy === 'date') {
+      const today = new Date(); today.setHours(0, 0, 0, 0);
+      const buckets: { label: string; tasks: Task[] }[] = [
+        { label: 'Overdue', tasks: [] },
+        { label: 'Today', tasks: [] },
+        { label: 'Upcoming', tasks: [] },
+        { label: 'No Date', tasks: [] },
+      ];
+      filtered.forEach(t => {
+        if (!t.dueDate) { buckets[3]?.tasks.push(t); return; }
+        const d = new Date(t.dueDate); d.setHours(0, 0, 0, 0);
+        if (d < today) buckets[0]?.tasks.push(t);
+        else if (d.getTime() === today.getTime()) buckets[1]?.tasks.push(t);
+        else buckets[2]?.tasks.push(t);
+      });
+      return buckets.filter(b => b.tasks.length > 0);
+    }
+
+    return null;
+  }, [filtered, groupBy, sortBy, sortDir, statuses, projects]);
 
   // Keyboard shortcut
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key === 'n') {
         e.preventDefault();
-        handleAddTask();
+        if (view === 'list') setInlineCreating(true);
+        else handleAddTask();
       }
     };
     window.addEventListener('keydown', handler);
@@ -162,7 +238,7 @@ export function TaskBoard({
 
   const handleAddTask = useCallback(
     (statusId?: string) => {
-      const firstStatus = statusId || statuses[0]?.id || 'backlog';
+      const firstStatus = statusId || statuses[0]?.id || 'explore';
       onTaskCreate({
         title: 'New Task',
         status: firstStatus,
@@ -218,6 +294,15 @@ export function TaskBoard({
     toast.success(`Moved ${selectedIds.size} task${selectedIds.size > 1 ? 's' : ''}`);
     setSelectedIds(new Set());
   }, [selectedIds, onTaskUpdate]);
+
+  const handleSelectAll = useCallback(() => {
+    const allSelected = filtered.length > 0 && filtered.every(t => selectedIds.has(t.id));
+    if (allSelected) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(filtered.map(t => t.id)));
+    }
+  }, [filtered, selectedIds]);
 
   const handleBulkMarkDone = useCallback(() => {
     const doneStatus = statuses.find(s => s.isDone);
@@ -298,7 +383,7 @@ export function TaskBoard({
         <Tooltip>
           <TooltipTrigger asChild>
             <button
-              onClick={() => { setView('list'); localStorage.setItem('flowki-task-view', 'list'); }}
+              onClick={() => { setView('list'); localStorage.setItem('hierarch-task-view', 'list'); }}
               className={cn(
                 'rounded-md p-1.5 transition-colors',
                 view === 'list' ? 'text-foreground' : 'text-muted-foreground/50 hover:text-muted-foreground',
@@ -312,7 +397,7 @@ export function TaskBoard({
         <Tooltip>
           <TooltipTrigger asChild>
             <button
-              onClick={() => { setView('board'); localStorage.setItem('flowki-task-view', 'board'); }}
+              onClick={() => { setView('board'); localStorage.setItem('hierarch-task-view', 'board'); }}
               className={cn(
                 'rounded-md p-1.5 transition-colors',
                 view === 'board' ? 'text-foreground' : 'text-muted-foreground/50 hover:text-muted-foreground',
@@ -391,7 +476,6 @@ export function TaskBoard({
                     <DropdownMenuSeparator />
                     {projects.map(p => (
                       <DropdownMenuItem key={p.id} onClick={() => handleBulkProject(p.name)}>
-                        {p.metadata?.icon && <span className="mr-1.5">{p.metadata.icon}</span>}
                         {p.name}
                       </DropdownMenuItem>
                     ))}
@@ -451,7 +535,7 @@ export function TaskBoard({
                   <DropdownMenuTrigger asChild>
                     <button className={cn(
                       'flex items-center gap-1.5 rounded-md px-2 py-1.5 text-xs transition-colors',
-                      sortBy !== 'status'
+                      sortBy !== 'status' || sortDir !== 'asc'
                         ? 'text-foreground font-medium'
                         : 'text-muted-foreground/60 hover:text-muted-foreground',
                     )}>
@@ -471,6 +555,25 @@ export function TaskBoard({
                     <DropdownMenuCheckboxItem checked={sortBy === 'project'} onCheckedChange={() => setSortBy('project')}>
                       Project
                     </DropdownMenuCheckboxItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuLabel>Direction</DropdownMenuLabel>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuCheckboxItem checked={sortDir === 'asc'} onCheckedChange={() => setSortDir('asc')}>
+                      <ArrowUp className="mr-2 h-3 w-3" />
+                      Ascending
+                    </DropdownMenuCheckboxItem>
+                    <DropdownMenuCheckboxItem checked={sortDir === 'desc'} onCheckedChange={() => setSortDir('desc')}>
+                      <ArrowDown className="mr-2 h-3 w-3" />
+                      Descending
+                    </DropdownMenuCheckboxItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuCheckboxItem
+                      checked={groupBy}
+                      onCheckedChange={(v) => setGroupBy(!!v)}
+                      onSelect={e => e.preventDefault()}
+                    >
+                      Group
+                    </DropdownMenuCheckboxItem>
                   </DropdownMenuContent>
                 </DropdownMenu>
 
@@ -479,19 +582,79 @@ export function TaskBoard({
                   <DropdownMenuTrigger asChild>
                     <button className={cn(
                       'flex items-center gap-1.5 rounded-md px-2 py-1.5 text-xs transition-colors',
-                      groupByProject
+                      filterStatuses.length > 0 || filterProjects.length > 0 || filterDueDate.length > 0
                         ? 'text-foreground font-medium'
                         : 'text-muted-foreground/60 hover:text-muted-foreground',
                     )}>
                       <SlidersHorizontal className="h-3.5 w-3.5" />
                       Filter
+                      {(filterStatuses.length + filterProjects.length + filterDueDate.length) > 0 && (
+                        <span className="rounded-full bg-primary/20 px-1.5 py-0.5 text-[10px] font-semibold text-primary leading-none">
+                          {filterStatuses.length + filterProjects.length + filterDueDate.length}
+                        </span>
+                      )}
                     </button>
                   </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end">
-                    <DropdownMenuCheckboxItem checked={groupByProject} onCheckedChange={(v) => setGroupByProject(!!v)}>
-                      <FolderKanban className="mr-2 h-3.5 w-3.5" />
-                      Group by project
-                    </DropdownMenuCheckboxItem>
+                  <DropdownMenuContent align="end" className="w-48">
+                    <DropdownMenuLabel>Status</DropdownMenuLabel>
+                    <DropdownMenuSeparator />
+                    {statuses.map(s => (
+                      <DropdownMenuCheckboxItem
+                        key={s.id}
+                        checked={filterStatuses.includes(s.id)}
+                        onCheckedChange={v => setFilterStatuses(prev => v ? [...prev, s.id] : prev.filter(x => x !== s.id))}
+                        onSelect={e => e.preventDefault()}
+                      >
+                        <div className={cn('mr-2 h-2 w-2 rounded-full shrink-0', s.color)} />
+                        {s.title}
+                      </DropdownMenuCheckboxItem>
+                    ))}
+                    {!projectFilter && (
+                      <>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuLabel>Project</DropdownMenuLabel>
+                        <DropdownMenuSeparator />
+                        {projects.map(p => (
+                          <DropdownMenuCheckboxItem
+                            key={p.id}
+                            checked={filterProjects.includes(p.id)}
+                            onCheckedChange={v => setFilterProjects(prev => v ? [...prev, p.id] : prev.filter(x => x !== p.id))}
+                            onSelect={e => e.preventDefault()}
+                          >
+                            {p.name}
+                          </DropdownMenuCheckboxItem>
+                        ))}
+                      </>
+                    )}
+                    <DropdownMenuSeparator />
+                    <DropdownMenuLabel>Due Date</DropdownMenuLabel>
+                    <DropdownMenuSeparator />
+                    {[
+                      { id: 'overdue', label: 'Overdue' },
+                      { id: 'today', label: 'Today' },
+                      { id: 'this_week', label: 'This week' },
+                      { id: 'no_date', label: 'No date' },
+                    ].map(opt => (
+                      <DropdownMenuCheckboxItem
+                        key={opt.id}
+                        checked={filterDueDate.includes(opt.id)}
+                        onCheckedChange={v => setFilterDueDate(prev => v ? [...prev, opt.id] : prev.filter(x => x !== opt.id))}
+                        onSelect={e => e.preventDefault()}
+                      >
+                        {opt.label}
+                      </DropdownMenuCheckboxItem>
+                    ))}
+                    {(filterStatuses.length > 0 || filterProjects.length > 0 || filterDueDate.length > 0) && (
+                      <>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem
+                          className="text-muted-foreground text-xs"
+                          onClick={() => { setFilterStatuses([]); setFilterProjects([]); setFilterDueDate([]); }}
+                        >
+                          Clear all filters
+                        </DropdownMenuItem>
+                      </>
+                    )}
                   </DropdownMenuContent>
                 </DropdownMenu>
               </motion.div>
@@ -510,7 +673,7 @@ export function TaskBoard({
                 <Settings2 className="h-4 w-4" />
               </button>
             </TooltipTrigger>
-            <TooltipContent>Manage statuses</TooltipContent>
+            <TooltipContent>Manage phases</TooltipContent>
           </Tooltip>
 
           {view === 'list' && (
@@ -531,7 +694,7 @@ export function TaskBoard({
 
           <Tooltip>
             <TooltipTrigger asChild>
-              <Button size="sm" className="h-7 gap-1.5 text-xs" onClick={() => handleAddTask()}>
+              <Button size="sm" className="h-7 gap-1.5 text-xs bg-[#bf7535] hover:bg-[#bf7535]/90" onClick={() => onNewTask ? onNewTask() : handleAddTask()}>
                 <Plus className="h-3.5 w-3.5" />
                 Add Task
               </Button>
@@ -566,15 +729,34 @@ export function TaskBoard({
           ) : (
             <ListView
               tasks={filtered}
-              tasksByProject={tasksByProject}
+              taskGroups={taskGroups}
               projects={projects}
               statuses={statuses}
               selectedIds={selectedIds}
               onSelect={toggleSelect}
+              onSelectAll={handleSelectAll}
               onUpdate={handleTaskUpdate}
               onDelete={onTaskDelete}
               onClick={onTaskClick}
+              onStartFocus={onStartFocus}
+              onCreateNote={onCreateNote}
+              focusTaskId={focusTaskId}
               columns={listColumns}
+              inlineCreating={inlineCreating}
+              onStartInline={() => setInlineCreating(true)}
+              onInlineSave={(title) => {
+                onTaskCreate({
+                  title,
+                  status: statuses[0]?.id || 'explore',
+                  description: '',
+                  tags: [],
+                  dueDate: '',
+                  assignees: [],
+                  order: filtered.length,
+                  project: projectFilter || undefined,
+                });
+              }}
+              onInlineCancel={() => setInlineCreating(false)}
             />
           )}
 
@@ -625,6 +807,91 @@ interface BoardViewProps {
   onAddTask: (statusId: string) => void;
 }
 
+function KanbanColumn({
+  status,
+  columnTasks,
+  projects,
+  statuses,
+  onUpdate,
+  onDelete,
+  onClick,
+  onAddTask,
+}: {
+  status: StatusConfig;
+  columnTasks: Task[];
+  projects: Project[];
+  statuses: StatusConfig[];
+  onUpdate: (id: string, updates: Partial<Task>) => void;
+  onDelete: (id: string) => void;
+  onClick: (task: Task) => void;
+  onAddTask: (statusId: string) => void;
+}) {
+  const { setNodeRef, isOver } = useDroppable({ id: status.id });
+
+  return (
+    <div className={cn(
+      'flex w-[280px] shrink-0 flex-col rounded-xl transition-colors',
+      isOver ? 'bg-muted/50' : 'bg-muted/30',
+    )}>
+      {/* Column header */}
+      <div className="flex items-center gap-2 px-3 py-2.5">
+        <div className={cn('h-2.5 w-2.5 rounded-full', status.color)} />
+        <span className="text-sm font-medium">{status.title}</span>
+        <span className={cn('ml-auto text-xs font-medium', status.countColor)}>
+          {columnTasks.length}
+        </span>
+      </div>
+
+      {/* Droppable + sortable area */}
+      <SortableContext
+        items={columnTasks.map(t => t.id)}
+        strategy={verticalListSortingStrategy}
+      >
+        <ScrollArea className="flex-1 px-2">
+          <div ref={setNodeRef} className="min-h-[80px] space-y-2 pb-2">
+            <AnimatePresence initial={false}>
+              {columnTasks.map(task => (
+                <motion.div
+                  key={task.id}
+                  layout
+                  initial={{ opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, scale: 0.95 }}
+                  transition={{ duration: 0.15 }}
+                >
+                  <TaskCard
+                    task={task}
+                    projects={projects}
+                    statuses={statuses}
+                    onUpdate={onUpdate}
+                    onDelete={onDelete}
+                    onClick={onClick}
+                  />
+                </motion.div>
+              ))}
+            </AnimatePresence>
+
+            {columnTasks.length === 0 && (
+              <div className="flex h-20 items-center justify-center rounded-lg border border-dashed text-xs text-muted-foreground">
+                Drop tasks here
+              </div>
+            )}
+          </div>
+        </ScrollArea>
+      </SortableContext>
+
+      {/* Add task */}
+      <button
+        onClick={() => onAddTask(status.id)}
+        className="mx-2 mb-2 flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+      >
+        <Plus className="h-3.5 w-3.5" />
+        Add task
+      </button>
+    </div>
+  );
+}
+
 function BoardView({
   tasksByStatus,
   statuses,
@@ -637,72 +904,19 @@ function BoardView({
   return (
     <div className="h-full overflow-x-auto">
       <div className="flex h-full min-w-max gap-4 p-4">
-        {statuses.map(status => {
-          const columnTasks = tasksByStatus.get(status.id) ?? [];
-          return (
-            <div
-              key={status.id}
-              className="flex w-[280px] shrink-0 flex-col rounded-xl bg-muted/30"
-            >
-              {/* Column header */}
-              <div className="flex items-center gap-2 px-3 py-2.5">
-                <div className={cn('h-2.5 w-2.5 rounded-full', status.color)} />
-                <span className="text-sm font-medium">{status.title}</span>
-                <span className={cn('ml-auto text-xs font-medium', status.countColor)}>
-                  {columnTasks.length}
-                </span>
-              </div>
-
-              {/* Droppable area */}
-              <SortableContext
-                items={columnTasks.map(t => t.id)}
-                strategy={verticalListSortingStrategy}
-                id={status.id}
-              >
-                <ScrollArea className="flex-1 px-2">
-                  <div className="space-y-2 pb-2">
-                    <AnimatePresence initial={false}>
-                      {columnTasks.map(task => (
-                        <motion.div
-                          key={task.id}
-                          layout
-                          initial={{ opacity: 0, y: 8 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          exit={{ opacity: 0, scale: 0.95 }}
-                          transition={{ duration: 0.15 }}
-                        >
-                          <TaskCard
-                            task={task}
-                            projects={projects}
-                            statuses={statuses}
-                            onUpdate={onUpdate}
-                            onDelete={onDelete}
-                            onClick={onClick}
-                          />
-                        </motion.div>
-                      ))}
-                    </AnimatePresence>
-
-                    {columnTasks.length === 0 && (
-                      <div className="flex h-20 items-center justify-center rounded-lg border border-dashed text-xs text-muted-foreground">
-                        Drop tasks here
-                      </div>
-                    )}
-                  </div>
-                </ScrollArea>
-              </SortableContext>
-
-              {/* Add task */}
-              <button
-                onClick={() => onAddTask(status.id)}
-                className="mx-2 mb-2 flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
-              >
-                <Plus className="h-3.5 w-3.5" />
-                Add task
-              </button>
-            </div>
-          );
-        })}
+        {statuses.map(status => (
+          <KanbanColumn
+            key={status.id}
+            status={status}
+            columnTasks={tasksByStatus.get(status.id) ?? []}
+            projects={projects}
+            statuses={statuses}
+            onUpdate={onUpdate}
+            onDelete={onDelete}
+            onClick={onClick}
+            onAddTask={onAddTask}
+          />
+        ))}
       </div>
     </div>
   );
@@ -712,29 +926,50 @@ function BoardView({
 
 interface ListViewProps {
   tasks: Task[];
-  tasksByProject: Map<string, Task[]> | null;
+  taskGroups: { label: string; tasks: Task[] }[] | null;
   projects: Project[];
   statuses: StatusConfig[];
   selectedIds: Set<string>;
   onSelect: (id: string) => void;
+  onSelectAll: () => void;
   onUpdate: (id: string, updates: Partial<Task>) => void;
   onDelete: (id: string) => void;
   onClick: (task: Task) => void;
+  onStartFocus?: (task: Task) => void;
+  onCreateNote?: (task: Task) => void;
+  focusTaskId?: string | null;
   columns: { id: string; title: string; visible: boolean; width: number }[];
+  inlineCreating: boolean;
+  onStartInline: () => void;
+  onInlineSave: (title: string) => void;
+  onInlineCancel: () => void;
 }
 
 function ListView({
   tasks,
-  tasksByProject,
+  taskGroups,
   projects,
   statuses,
   selectedIds,
   onSelect,
+  onSelectAll,
   onUpdate,
   onDelete,
   onClick,
+  onStartFocus,
+  onCreateNote,
+  focusTaskId,
   columns,
+  inlineCreating,
+  onStartInline,
+  onInlineSave,
+  onInlineCancel,
 }: ListViewProps) {
+  const { widths, columnTemplate, onResizeStart } = useColumnWidths();
+
+  const allSelected = tasks.length > 0 && tasks.every(t => selectedIds.has(t.id));
+  const someSelected = !allSelected && tasks.some(t => selectedIds.has(t.id));
+
   const renderRows = (items: Task[]) => (
     <SortableContext items={items.map(t => t.id)} strategy={verticalListSortingStrategy}>
       <AnimatePresence initial={false}>
@@ -742,8 +977,8 @@ function ListView({
           <motion.div
             key={task.id}
             layout
-            initial={{ opacity: 0, y: 4 }}
-            animate={{ opacity: 1, y: 0 }}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
             exit={{ opacity: 0, height: 0 }}
             transition={{ duration: 0.12 }}
           >
@@ -757,6 +992,10 @@ function ListView({
               onUpdate={onUpdate}
               onDelete={onDelete}
               onClick={onClick}
+              onStartFocus={onStartFocus}
+              onCreateNote={onCreateNote}
+              focusTaskId={focusTaskId}
+              columnTemplate={columnTemplate}
             />
           </motion.div>
         ))}
@@ -768,51 +1007,127 @@ function ListView({
     <ScrollArea className="h-full">
       <div className="min-w-[600px]">
         {/* Header */}
-        <div className="grid grid-cols-[40px_1fr_140px_120px] items-center border-b bg-muted/30 px-0 py-1.5 text-xs font-medium text-muted-foreground">
-          {columns.find(c => c.id === 'select')?.visible !== false && (
-            <div className="px-2" />
-          )}
-          {columns.find(c => c.id === 'title')?.visible !== false && (
-            <div className="px-3">Task</div>
-          )}
-          {columns.find(c => c.id === 'project')?.visible !== false && (
-            <div className="px-2">Project</div>
-          )}
-          {columns.find(c => c.id === 'dueDate')?.visible !== false && (
-            <div className="px-2">Due Date</div>
-          )}
+        <div
+          style={{ gridTemplateColumns: columnTemplate }}
+          className="grid items-center border-b bg-muted/30 py-1.5 text-xs font-medium text-muted-foreground select-none"
+        >
+          <div className="flex items-center justify-center px-2">
+            <Checkbox
+              checked={someSelected ? 'indeterminate' : allSelected}
+              onCheckedChange={onSelectAll}
+              className="h-3.5 w-3.5"
+            />
+          </div>
+          <div className="relative px-3">
+            Task
+            <div onMouseDown={onResizeStart('title', widths.title)} className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-white/20 rounded" />
+          </div>
+          <div className="relative px-2">
+            Project
+            <div onMouseDown={onResizeStart('project', widths.project)} className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-white/20 rounded" />
+          </div>
+          <div className="relative px-2">
+            Due Date
+          </div>
+          <div /> {/* more menu col */}
         </div>
 
         {/* Rows */}
-        {tasksByProject ? (
-          Array.from(tasksByProject.entries()).map(([key, items]) => {
-            const proj = projects.find(p => p.id === key);
-            return (
-              <div key={key}>
-                <div className="flex items-center gap-2 border-b bg-muted/20 px-4 py-1.5">
-                  <FolderKanban className="h-3.5 w-3.5 text-muted-foreground" />
-                  <span className="text-xs font-semibold">
-                    {proj ? proj.name : 'No Project'}
-                  </span>
-                  <Badge variant="secondary" className="text-[10px]">
-                    {items.length}
-                  </Badge>
-                </div>
-                {renderRows(items)}
+        {taskGroups ? (
+          taskGroups.map(({ label, tasks: groupTasks }) => (
+            <div key={label}>
+              <div className="flex items-center gap-2 border-b bg-muted/20 px-4 py-1.5">
+                <span className="text-xs font-semibold">{label}</span>
+                <Badge variant="secondary" className="text-[10px]">{groupTasks.length}</Badge>
               </div>
-            );
-          })
+              {renderRows(groupTasks)}
+            </div>
+          ))
         ) : (
           renderRows(tasks)
         )}
 
-        {tasks.length === 0 && (
-          <div className="flex h-40 flex-col items-center justify-center gap-2 text-muted-foreground">
+        {tasks.length === 0 && !inlineCreating && (
+          <div className="flex h-32 flex-col items-center justify-center gap-2 text-muted-foreground">
             <p className="text-sm">No tasks yet</p>
-            <p className="text-xs">Press <kbd className="rounded border bg-muted px-1.5 py-0.5 text-[10px]">Ctrl+N</kbd> to create one</p>
           </div>
+        )}
+
+        {/* Inline creation row */}
+        {inlineCreating && (
+          <InlineTaskRow
+            onSave={onInlineSave}
+            onCancel={onInlineCancel}
+            columnTemplate={columnTemplate}
+          />
+        )}
+
+        {/* Add a task affordance */}
+        {!inlineCreating && (
+          <button
+            onClick={onStartInline}
+            className="flex w-full items-center gap-2 px-4 py-2.5 text-xs text-muted-foreground/30 hover:text-muted-foreground/70 transition-colors"
+          >
+            <Plus className="h-3 w-3" />
+            Add a task…
+          </button>
         )}
       </div>
     </ScrollArea>
+  );
+}
+
+/* ─── Inline Task Row ─── */
+
+function InlineTaskRow({
+  onSave,
+  onCancel,
+  columnTemplate,
+}: {
+  onSave: (title: string) => void;
+  onCancel: () => void;
+  columnTemplate: string;
+}) {
+  const [value, setValue] = useState('');
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    inputRef.current?.focus();
+  }, []);
+
+  return (
+    <div
+      style={{ gridTemplateColumns: columnTemplate }}
+      className="grid items-center border-b border-border/40 py-1.5"
+    >
+      <div /> {/* select col */}
+      <div className="px-3">
+        <input
+          ref={inputRef}
+          value={value}
+          onChange={e => setValue(e.target.value)}
+          onKeyDown={e => {
+            if (e.key === 'Enter') {
+              e.preventDefault();
+              if (value.trim()) {
+                onSave(value.trim());
+                setValue('');
+              }
+            } else if (e.key === 'Escape') {
+              onCancel();
+            }
+          }}
+          onBlur={() => {
+            if (value.trim()) onSave(value.trim());
+            onCancel();
+          }}
+          placeholder="Task name…"
+          className="w-full bg-transparent text-sm text-foreground outline-none placeholder:text-muted-foreground/40"
+        />
+      </div>
+      <div /> {/* project col */}
+      <div /> {/* due col */}
+      <div /> {/* more col */}
+    </div>
   );
 }
