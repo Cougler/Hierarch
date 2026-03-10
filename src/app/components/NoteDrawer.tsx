@@ -325,7 +325,7 @@ export function NoteDrawer({
               transition={{ delay: 0.25, type: 'spring', stiffness: 320, damping: 28 }}
               onClick={() => onOpenChange(false)}
               style={{ backgroundColor: '#1c1c1a' }}
-              className="fixed top-[50px] right-[462px] z-50 flex h-[60px] w-8 items-center justify-center rounded-full text-muted-foreground shadow-lg border border-white/[0.08] hover:text-foreground transition-colors"
+              className="fixed top-8 right-[460px] z-50 flex h-[60px] w-8 items-center justify-center rounded-full text-muted-foreground shadow-lg border border-white/[0.08] hover:text-foreground transition-colors"
             >
               <X className="h-3.5 w-3.5" />
             </motion.button>
@@ -338,7 +338,7 @@ export function NoteDrawer({
               exit={{ opacity: 0, scale: 0.88 }}
               transition={{ type: 'spring', stiffness: 420, damping: 32, mass: 0.7 }}
               style={{ backgroundColor: '#1c1c1a', transformOrigin: 'top right' }}
-              className="fixed top-[50px] right-[30px] z-50 w-[420px] max-h-[calc(100vh-60px)] rounded-2xl shadow-2xl border border-white/[0.08] overflow-hidden flex flex-col"
+              className="fixed top-8 right-8 bottom-8 z-50 w-[420px] rounded-2xl shadow-2xl border border-white/[0.08] overflow-hidden flex flex-col"
             >
               <div className="flex-1 min-h-0 overflow-y-auto">{content}</div>
             </motion.div>

@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useMemo } from 'react'
 import { format, formatDistanceToNow, isToday, subDays, isBefore, startOfDay } from 'date-fns'
 import { motion, AnimatePresence } from 'motion/react'
 import { cn } from '@/app/lib/utils'
@@ -54,6 +54,8 @@ interface BriefingProps {
   onNoteCreate: (projectId: string) => void
   onNoteClick: (note: DesignNote) => void
   onProjectUpdate?: (id: string, updates: Partial<Project>) => void
+  previewProject: Project | null
+  onPreviewProjectChange: (project: Project | null) => void
 }
 
 function getTimeOfDay(): string {
@@ -85,10 +87,12 @@ export function Briefing({
   designNotes,
   onNoteCreate,
   onNoteClick,
+  previewProject,
+  onPreviewProjectChange,
   onProjectUpdate,
 }: BriefingProps) {
   const firstName = userName.split(' ')[0]
-  const [previewProject, setPreviewProject] = useState<Project | null>(null)
+  const setPreviewProject = onPreviewProjectChange
   const statusMap = new Map(statuses.map(s => [s.id, s]))
   const doneStatuses = useMemo(
     () => new Set(statuses.filter(s => s.isDone).map(s => s.id)),
@@ -343,11 +347,11 @@ export function Briefing({
                       return (
                         <div key={project.id} className={i > 0 ? 'border-t border-border/50' : ''}>
                           {/* Project row */}
-                          <div className="group flex items-center gap-3 py-2 -mx-2 px-2 rounded-md">
-                            <button
-                              onClick={() => setPreviewProject(project)}
-                              className="flex-1 min-w-0 text-left flex items-center gap-2"
-                            >
+                          <div
+                            onClick={() => setPreviewProject(project)}
+                            className="group flex items-center gap-3 py-2 -mx-2 px-2 rounded-md cursor-pointer transition-colors hover:bg-accent/20"
+                          >
+                            <div className="flex-1 min-w-0 flex items-center gap-2">
                               <span className="text-xs font-medium text-foreground truncate">{project.name}</span>
                               <span className="text-[10px] text-muted-foreground/60 shrink-0">
                                 {taskCount}
@@ -355,7 +359,7 @@ export function Briefing({
                                   <> · {formatDistanceToNow(lastActivity, { addSuffix: true })}</>
                                 )}
                               </span>
-                            </button>
+                            </div>
                             <div className="flex items-center gap-1.5 shrink-0">
                               {projectNotes.length > 0 && (
                                 <span className="text-[10px] text-muted-foreground/50 tabular-nums">
@@ -372,12 +376,7 @@ export function Briefing({
                               >
                                 <MessageSquarePlus className="h-3 w-3" />
                               </button>
-                              <button
-                                onClick={() => setPreviewProject(project)}
-                                className="p-0.5 text-muted-foreground/30 hover:text-muted-foreground transition-colors"
-                              >
-                                <ChevronRight className="h-3.5 w-3.5" />
-                              </button>
+                              <ChevronRight className="h-3.5 w-3.5 text-muted-foreground/30" />
                             </div>
                           </div>
 
@@ -387,7 +386,7 @@ export function Briefing({
                               {projectAttention.map(item => (
                                 <button
                                   key={item.task.id}
-                                  onClick={() => onTaskClick(item.task)}
+                                  onClick={() => { setPreviewProject(null); onTaskClick(item.task) }}
                                   className="w-full flex items-center gap-1.5 px-2 py-1 rounded text-left transition-colors hover:bg-accent/20"
                                 >
                                   <div
@@ -420,7 +419,7 @@ export function Briefing({
                       {unassignedAttention.map(item => (
                         <button
                           key={item.task.id}
-                          onClick={() => onTaskClick(item.task)}
+                          onClick={() => { setPreviewProject(null); onTaskClick(item.task) }}
                           className="w-full flex items-center gap-2 px-3 py-1.5 rounded-md text-left transition-colors hover:bg-accent/20"
                         >
                           <div
@@ -596,7 +595,7 @@ export function Briefing({
                 transition={{ delay: 0.25, type: 'spring', stiffness: 320, damping: 28 }}
                 onClick={() => setPreviewProject(null)}
                 style={{ backgroundColor: '#1c1c1a' }}
-                className="fixed top-8 right-[484px] z-50 flex h-[60px] w-8 items-center justify-center rounded-full text-muted-foreground shadow-lg border border-white/[0.08] hover:text-foreground transition-colors"
+                className="fixed top-8 right-[460px] z-50 flex h-[60px] w-8 items-center justify-center rounded-full text-muted-foreground shadow-lg border border-white/[0.08] hover:text-foreground transition-colors"
               >
                 <X className="h-3.5 w-3.5" />
               </motion.button>

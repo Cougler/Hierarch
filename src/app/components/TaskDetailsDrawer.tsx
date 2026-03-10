@@ -21,7 +21,7 @@ import {
 } from '@/app/components/ui/dialog';
 import { ScrollArea } from '@/app/components/ui/scroll-area';
 import {
-  Calendar as CalendarIcon, Check, Clock, ExternalLink, Plus, Trash2, X,
+  Calendar as CalendarIcon, Check, ChevronRight, Clock, ExternalLink, Folder, Plus, Trash2, X,
 } from 'lucide-react';
 import { Calendar } from '@/app/components/ui/calendar';
 import { format, parseISO, isToday, isPast } from 'date-fns';
@@ -112,9 +112,24 @@ export function TaskDetailsDrawer({
   const overdue = parsed && isPast(parsed) && !isToday(parsed);
   const today = parsed && isToday(parsed);
 
+  const taskProject = task ? projects.find(p => p.id === task.project || p.name === task.project) : undefined;
+
   const content = task ? (
     <ScrollArea key={task.id} className="h-full">
       <div className="space-y-5 p-1">
+        {/* Project breadcrumb */}
+        {taskProject && (
+          <div className="flex items-center gap-1.5 text-xs text-muted-foreground/60">
+            {(() => {
+              const IconComp = taskProject.metadata?.icon ? getIconComponent(taskProject.metadata.icon) : Folder;
+              return <IconComp className="h-3 w-3 shrink-0" />;
+            })()}
+            <span className="truncate">{taskProject.name}</span>
+            <ChevronRight className="h-3 w-3 shrink-0" />
+            <span className="text-muted-foreground/40 truncate">Task</span>
+          </div>
+        )}
+
         {/* Title */}
         <Input
           ref={titleRef}
@@ -511,7 +526,7 @@ export function TaskDetailsDrawer({
               transition={{ delay: 0.25, type: 'spring', stiffness: 320, damping: 28 }}
               onClick={() => onOpenChange(false)}
               style={{ backgroundColor: '#1c1c1a' }}
-              className="fixed top-[50px] right-[462px] z-50 flex h-[60px] w-8 items-center justify-center rounded-full text-muted-foreground shadow-lg border border-white/[0.08] hover:text-foreground transition-colors"
+              className="fixed top-8 right-[460px] z-50 flex h-[60px] w-8 items-center justify-center rounded-full text-muted-foreground shadow-lg border border-white/[0.08] hover:text-foreground transition-colors"
             >
               <X className="h-3.5 w-3.5" />
             </motion.button>
@@ -524,7 +539,7 @@ export function TaskDetailsDrawer({
               exit={{ opacity: 0, scale: 0.88 }}
               transition={{ type: 'spring', stiffness: 420, damping: 32, mass: 0.7 }}
               style={{ backgroundColor: '#1c1c1a', transformOrigin: 'top right' }}
-              className="fixed top-[50px] right-[30px] z-50 w-[420px] max-h-[calc(100vh-60px)] rounded-2xl shadow-2xl border border-white/[0.08] overflow-hidden flex flex-col"
+              className="fixed top-8 right-8 bottom-8 z-50 w-[420px] rounded-2xl shadow-2xl border border-white/[0.08] overflow-hidden flex flex-col"
             >
               <div className="flex-1 min-h-0 overflow-y-auto p-2">{content}</div>
             </motion.div>

@@ -86,6 +86,7 @@ export default function App() {
   })
   const [selectedNote, setSelectedNote] = useState<DesignNote | null>(null)
   const [noteDrawerOpen, setNoteDrawerOpen] = useState(false)
+  const [previewProject, setPreviewProject] = useState<Project | null>(null)
 
   const tempIdMapping = useRef<Record<string, string>>({})
   const savingTaskIds = useRef<Set<string>>(new Set())
@@ -398,8 +399,15 @@ export default function App() {
     else toast.success('Task deleted')
   }
 
-  const handleTaskClick = (task: Task) => {
+  const closeAllDrawers = () => {
+    setTaskDrawerOpen(false)
     setNewTaskDrawerOpen(false)
+    setNoteDrawerOpen(false)
+    setPreviewProject(null)
+  }
+
+  const handleTaskClick = (task: Task) => {
+    closeAllDrawers()
     setSelectedTask(task)
     setTaskDrawerOpen(true)
   }
@@ -469,17 +477,15 @@ export default function App() {
       updatedAt: new Date().toISOString(),
     }
     setDesignNotes(prev => [note, ...prev])
+    closeAllDrawers()
     setSelectedNote(note)
     setNoteDrawerOpen(true)
-    setTaskDrawerOpen(false)
-    setNewTaskDrawerOpen(false)
   }
 
   const handleNoteClick = (note: DesignNote) => {
+    closeAllDrawers()
     setSelectedNote(note)
     setNoteDrawerOpen(true)
-    setTaskDrawerOpen(false)
-    setNewTaskDrawerOpen(false)
   }
 
   const handleNoteUpdate = (id: string, updates: Partial<DesignNote>) => {
@@ -558,7 +564,7 @@ export default function App() {
   }
 
   const handleOpenNewTask = (defaultProjectId?: string) => {
-    setTaskDrawerOpen(false)
+    closeAllDrawers()
     setNewTaskDefaultProjectId(defaultProjectId)
     setNewTaskDrawerOpen(true)
   }
@@ -635,6 +641,7 @@ export default function App() {
 
   // View change handler
   const handleViewChange = (view: string) => {
+    closeAllDrawers()
     setActiveView(view)
     if (isMobile) setSidebarOpen(false)
   }
@@ -656,6 +663,15 @@ export default function App() {
           onNoteCreate={handleNoteCreate}
           onNoteClick={handleNoteClick}
           onProjectUpdate={handleProjectUpdate}
+          previewProject={previewProject}
+          onPreviewProjectChange={(project) => {
+            if (project) {
+              closeAllDrawers()
+              setPreviewProject(project)
+            } else {
+              setPreviewProject(null)
+            }
+          }}
         />
       )
     }

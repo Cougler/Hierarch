@@ -97,7 +97,7 @@ export function NewTaskDrawer({
             exit={{ opacity: 0 }}
             transition={{ duration: 0.15 }}
             onClick={() => onOpenChange(false)}
-            className="fixed top-[50px] right-[562px] z-50 flex h-8 w-8 items-center justify-center rounded-full bg-white/[0.06] text-muted-foreground shadow-lg border border-white/[0.08] hover:bg-white/[0.12] hover:text-foreground transition-colors"
+            className="fixed top-8 right-[560px] z-50 flex h-8 w-8 items-center justify-center rounded-full bg-white/[0.06] text-muted-foreground shadow-lg border border-white/[0.08] hover:bg-white/[0.12] hover:text-foreground transition-colors"
           >
             <X className="h-3.5 w-3.5" />
           </motion.button>
@@ -110,7 +110,7 @@ export function NewTaskDrawer({
             exit={{ opacity: 0, scale: 0.88 }}
             transition={{ type: 'spring', stiffness: 420, damping: 32, mass: 0.7 }}
             style={{ backgroundColor: '#1c1c1a', transformOrigin: 'top right' }}
-            className="fixed top-[50px] right-[30px] z-50 w-[520px] max-h-[calc(100vh-60px)] rounded-2xl shadow-2xl border border-white/[0.08] flex overflow-hidden"
+            className="fixed top-8 right-8 bottom-8 z-50 w-[520px] rounded-2xl shadow-2xl border border-white/[0.08] flex overflow-hidden"
           >
             {/* Left: Task form */}
             <div className="flex-1 flex flex-col gap-4 p-5 overflow-auto">
