@@ -23,8 +23,8 @@ import {
 } from '@/app/components/ui/tooltip';
 import {
   Compass, ListTodo, Plus, MoreHorizontal, Pencil, Copy, Trash2,
-  ChevronDown, LogOut, Settings, User, Moon, Sun, X, BarChart2, Paperclip,
-  SquarePen, FolderPlus, CheckSquare, Layers,
+  ChevronDown, LogOut, Settings, User, Moon, Sun, X, BarChart2, StickyNote,
+  SquarePen, FolderPlus, CheckSquare, Layers, FolderKanban,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { DndContext, closestCenter, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
@@ -36,18 +36,13 @@ import { IconPicker, getIconComponent } from '@/app/components/IconPicker';
 import type { Project, ProjectMetadata } from '@/app/types';
 import { toast } from 'sonner';
 
-const PROJECTS_VISIBLE = 8;
-
 interface SidebarProps {
   projects: Project[];
   activeView: string;
   onViewChange: (view: string) => void;
-  onProjectsReorder: (projects: Project[]) => void;
-  onProjectCreate: (name: string, metadata?: ProjectMetadata) => void;
-  onProjectUpdate: (id: string, updates: Partial<Project>) => void;
-  onProjectDelete: (id: string) => void;
   todayCount: number;
   allTasksCount: number;
+  pinnedVersion: number;
   user: { email?: string; user_metadata?: { name?: string; avatar_url?: string } } | null;
   onLogout: () => void;
   onShowOnboarding: () => void;
@@ -56,7 +51,8 @@ interface SidebarProps {
   onClose?: () => void;
 }
 
-function SortableProjectItem({
+// Kept for future use (sortable project list in sidebar)
+export function SortableProjectItem({
   project,
   isActive,
   onSelect,
@@ -160,12 +156,9 @@ export function Sidebar({
   projects,
   activeView,
   onViewChange,
-  onProjectsReorder,
-  onProjectCreate,
-  onProjectUpdate,
-  onProjectDelete,
   todayCount,
   allTasksCount,
+  pinnedVersion,
   user,
   onLogout,
   onShowOnboarding,
@@ -174,83 +167,23 @@ export function Sidebar({
   onClose,
 }: SidebarProps) {
   const { resolvedTheme, setTheme } = useTheme();
-  const [deleteTarget, setDeleteTarget] = useState<Project | null>(null);
-  const [renameTarget, setRenameTarget] = useState<Project | null>(null);
-  const [renameValue, setRenameValue] = useState('');
-  const [isCreating, setIsCreating] = useState(false);
-  const [newProjectName, setNewProjectName] = useState('');
-  const [newProjectIcon, setNewProjectIcon] = useState('Folder');
-  const [newProjectColor, setNewProjectColor] = useState('bg-blue-500');
-  const [showAllProjects, setShowAllProjects] = useState(false);
-  const renameInputRef = useRef<HTMLInputElement>(null);
-  const newProjectInputRef = useRef<HTMLInputElement>(null);
-
-  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
-
-  useEffect(() => {
-    if (renameTarget && renameInputRef.current) {
-      renameInputRef.current.focus();
-      renameInputRef.current.select();
-    }
-  }, [renameTarget]);
-
-  useEffect(() => {
-    if (isCreating && newProjectInputRef.current) {
-      newProjectInputRef.current.focus();
-    }
-  }, [isCreating]);
-
-  const handleDragEnd = useCallback((event: DragEndEvent) => {
-    const { active, over } = event;
-    if (!over || active.id === over.id) return;
-    const oldIndex = projects.findIndex(p => p.id === active.id);
-    const newIndex = projects.findIndex(p => p.id === over.id);
-    const reordered = arrayMove(projects, oldIndex, newIndex).map((p, i) => ({
-      ...p,
-      metadata: { ...p.metadata, order: i },
-    }));
-    onProjectsReorder(reordered);
-  }, [projects, onProjectsReorder]);
-
-  const handleRenameSubmit = () => {
-    if (!renameTarget || !renameValue.trim()) return;
-    onProjectUpdate(renameTarget.id, { name: renameValue.trim() });
-    setRenameTarget(null);
-    toast.success('Project renamed');
-  };
-
-  const handleCreateSubmit = () => {
-    const name = newProjectName.trim();
-    if (!name) return;
-    const metadata: ProjectMetadata = { icon: newProjectIcon, color: newProjectColor, order: projects.length };
-    onProjectCreate(name, metadata);
-    setNewProjectName('');
-    setNewProjectIcon('Folder');
-    setNewProjectColor('bg-blue-500');
-    setIsCreating(false);
-    toast.success('Project created');
-  };
-
-  const handleDuplicate = (project: Project) => {
-    onProjectCreate(`${project.name} (copy)`, project.metadata);
-    toast.success('Project duplicated');
-  };
-
-  const handleConfirmDelete = () => {
-    if (!deleteTarget) return;
-    onProjectDelete(deleteTarget.id);
-    setDeleteTarget(null);
-    toast.success('Project deleted');
-  };
 
   const userName = user?.user_metadata?.name || user?.email?.split('@')[0] || 'User';
   const avatarUrl = user?.user_metadata?.avatar_url;
   const initials = userName.slice(0, 2).toUpperCase();
 
-  // Only non-section real projects
-  const realProjects = projects.filter(p => p.metadata?.type !== 'section');
-  const visibleProjects = showAllProjects ? realProjects : realProjects.slice(0, PROJECTS_VISIBLE);
-  const hasMore = realProjects.length > PROJECTS_VISIBLE;
+  // Read pinned projects from localStorage (re-reads when pinnedVersion changes)
+  const pinnedIds: string[] = (() => {
+    try {
+      const raw = localStorage.getItem('hierarch-pinned-projects');
+      return raw ? JSON.parse(raw) : [];
+    } catch { return []; }
+  })();
+  // Force dependency on pinnedVersion so this recalculates
+  void pinnedVersion;
+  const pinnedProjects = pinnedIds
+    .map(id => projects.find(p => p.id === id))
+    .filter((p): p is Project => !!p);
 
   const sidebarContent = (
     <TooltipProvider delayDuration={300}>
@@ -272,7 +205,7 @@ export function Sidebar({
               <DropdownMenuItem onClick={() => { onNewTask(); onClose?.(); }}>
                 <CheckSquare className="mr-2 h-4 w-4" /> New Task
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => { setIsCreating(true); onClose?.(); }}>
+              <DropdownMenuItem onClick={() => { onViewChange('projects'); onClose?.(); }}>
                 <FolderPlus className="mr-2 h-4 w-4" /> New Project
               </DropdownMenuItem>
             </DropdownMenuContent>
@@ -286,7 +219,7 @@ export function Sidebar({
         </div>
 
         {/* Primary nav */}
-        <div className="px-3 space-y-1">
+        <div className="px-3 space-y-1 flex-1">
           <NavItem
             icon={<Compass className="h-4 w-4 shrink-0" />}
             label="Overview"
@@ -307,10 +240,16 @@ export function Sidebar({
             onClick={() => { onViewChange('capacity'); onClose?.(); }}
           />
           <NavItem
-            icon={<Paperclip className="h-4 w-4 shrink-0" />}
-            label="Resources"
+            icon={<StickyNote className="h-4 w-4 shrink-0" />}
+            label="Notes"
             isActive={activeView === 'attachments'}
             onClick={() => { onViewChange('attachments'); onClose?.(); }}
+          />
+          <NavItem
+            icon={<FolderKanban className="h-4 w-4 shrink-0" />}
+            label="Projects"
+            isActive={activeView === 'projects' || activeView.startsWith('project:')}
+            onClick={() => { onViewChange('projects'); onClose?.(); }}
           />
           <NavItem
             icon={<Layers className="h-4 w-4 shrink-0" />}
@@ -318,116 +257,37 @@ export function Sidebar({
             isActive={activeView === 'linear'}
             onClick={() => { onViewChange('linear'); onClose?.(); }}
           />
-        </div>
 
-        {/* Projects section */}
-        <div className="mt-6 px-4 mb-2 flex items-center justify-between">
-          <span className="text-[11px] font-semibold uppercase tracking-wider text-foreground/40">
-            Projects
-          </span>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-5 w-5 text-muted-foreground/60 hover:text-foreground"
-                onClick={() => setIsCreating(true)}
-              >
-                <Plus className="h-3 w-3" />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>New Project</TooltipContent>
-          </Tooltip>
-        </div>
-
-        {/* New project inline form */}
-        <AnimatePresence>
-          {isCreating && (
-            <motion.div
-              initial={{ height: 0, opacity: 0 }}
-              animate={{ height: 'auto', opacity: 1 }}
-              exit={{ height: 0, opacity: 0 }}
-              className="overflow-hidden px-3"
-            >
-              <div className="flex items-center gap-1.5 py-1.5">
-                <IconPicker
-                  value={newProjectIcon}
-                  color={newProjectColor}
-                  onChange={(icon, color) => { setNewProjectIcon(icon); setNewProjectColor(color); }}
-                />
-                <Input
-                  ref={newProjectInputRef}
-                  value={newProjectName}
-                  onChange={(e) => setNewProjectName(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') handleCreateSubmit();
-                    if (e.key === 'Escape') setIsCreating(false);
-                  }}
-                  placeholder="Project name..."
-                  className="h-7 flex-1 text-xs"
-                />
-                <Button size="sm" className="h-7 px-2 text-xs" onClick={handleCreateSubmit}>
-                  Add
-                </Button>
+          {/* Pinned projects */}
+          {pinnedProjects.length > 0 && (
+            <>
+              <div className="mt-4 mb-1 px-1">
+                <span className="text-[11px] font-semibold uppercase tracking-wider text-foreground/40">
+                  Pinned
+                </span>
               </div>
-            </motion.div>
+              {pinnedProjects.map(project => {
+                const Icon = getIconComponent(project.metadata?.icon);
+                const viewKey = `project:${project.name}`;
+                return (
+                  <button
+                    key={project.id}
+                    onClick={() => { onViewChange(viewKey); onClose?.(); }}
+                    className={cn(
+                      'flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm transition-colors',
+                      activeView === viewKey
+                        ? 'bg-accent text-foreground font-medium'
+                        : 'text-foreground/60 hover:bg-accent/60 hover:text-foreground'
+                    )}
+                  >
+                    <Icon className="h-4 w-4 shrink-0 text-foreground/50" />
+                    <span className="flex-1 text-left truncate">{project.name}</span>
+                  </button>
+                );
+              })}
+            </>
           )}
-        </AnimatePresence>
-
-        {/* Project list */}
-        <ScrollArea className="flex-1 px-3">
-          <div className="pb-4 space-y-0.5">
-            <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-              <SortableContext items={visibleProjects.map(p => p.id)} strategy={verticalListSortingStrategy}>
-                {visibleProjects.map((project) => {
-                  const viewKey = `project:${project.name}`;
-                  const isRenaming = renameTarget?.id === project.id;
-
-                  if (isRenaming) {
-                    return (
-                      <div key={project.id} className="flex items-center gap-2 px-2 py-1">
-                        <Input
-                          ref={renameInputRef}
-                          value={renameValue}
-                          onChange={(e) => setRenameValue(e.target.value)}
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter') handleRenameSubmit();
-                            if (e.key === 'Escape') setRenameTarget(null);
-                          }}
-                          onBlur={handleRenameSubmit}
-                          className="h-7 flex-1 text-sm"
-                        />
-                      </div>
-                    );
-                  }
-
-                  return (
-                    <SortableProjectItem
-                      key={project.id}
-                      project={project}
-                      isActive={activeView === viewKey}
-                      onSelect={() => { onViewChange(viewKey); onClose?.(); }}
-                      onRename={() => { setRenameTarget(project); setRenameValue(project.name); }}
-                      onDuplicate={() => handleDuplicate(project)}
-                      onDelete={() => setDeleteTarget(project)}
-                    />
-                  );
-                })}
-              </SortableContext>
-            </DndContext>
-
-            {/* More / Less toggle */}
-            {hasMore && (
-              <button
-                onClick={() => setShowAllProjects(v => !v)}
-                className="flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm text-muted-foreground/60 hover:bg-accent/60 hover:text-muted-foreground transition-colors"
-              >
-                <MoreHorizontal className="h-4 w-4 shrink-0" />
-                <span>{showAllProjects ? 'Show less' : `${realProjects.length - PROJECTS_VISIBLE} more`}</span>
-              </button>
-            )}
-          </div>
-        </ScrollArea>
+        </div>
 
         {/* Account footer */}
         <div className="px-3 py-3 border-t border-border/40">
@@ -466,27 +326,6 @@ export function Sidebar({
           </DropdownMenu>
         </div>
       </div>
-
-      {/* Delete confirmation */}
-      <AlertDialog open={!!deleteTarget} onOpenChange={(open) => !open && setDeleteTarget(null)}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Delete &ldquo;{deleteTarget?.name}&rdquo;?</AlertDialogTitle>
-            <AlertDialogDescription>
-              This will permanently delete this project and all its tasks. This action cannot be undone.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={handleConfirmDelete}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-            >
-              Delete
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </TooltipProvider>
   );
 

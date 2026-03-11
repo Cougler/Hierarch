@@ -31,6 +31,7 @@ import { UpdateNotification } from './components/UpdateNotification'
 import { CapacityView } from './components/CapacityView'
 import { FocusTimerView } from './components/FocusTimerView'
 import { LinearView } from './components/LinearView'
+import { ProjectsPage } from './components/ProjectsPage'
 import { FeedbackPrompt } from './components/FeedbackPrompt'
 import { NoteDrawer } from './components/NoteDrawer'
 import type { DesignNote } from './components/NoteDrawer'
@@ -70,6 +71,7 @@ export default function App() {
   const [demoMode, setDemoMode] = useState(false)
   const [feedbackPrompt, setFeedbackPrompt] = useState<{ taskId: string; fromPhase: string } | null>(null)
   const [focusTask, setFocusTask] = useState<Task | null>(null)
+  const [pinnedVersion, setPinnedVersion] = useState(0)
 
   // Design notes
   const [designNotes, setDesignNotes] = useState<DesignNote[]>(() => {
@@ -769,6 +771,20 @@ export default function App() {
       )
     }
 
+    if (activeView === 'projects') {
+      return (
+        <ProjectsPage
+          projects={projects}
+          tasks={tasks}
+          onViewChange={handleViewChange}
+          onProjectCreate={handleProjectCreate}
+          onProjectUpdate={handleProjectUpdate}
+          onProjectDelete={handleProjectDelete}
+          onPinnedChange={() => setPinnedVersion(v => v + 1)}
+        />
+      )
+    }
+
     if (activeView === 'figma') return <FigmaView />
     if (activeView === 'apps') return <AppsDashboard />
     if (activeView === 'linear') return <LinearView />
@@ -799,7 +815,8 @@ export default function App() {
     if (activeView === 'today') return 'Overview'
     if (activeView === 'tasks') return 'All Tasks'
     if (activeView.startsWith('project:')) return activeView.replace('project:', '')
-    if (activeView === 'attachments') return 'Resources'
+    if (activeView === 'attachments') return 'Notes'
+    if (activeView === 'projects') return 'Projects'
     if (activeView === 'capacity') return 'Capacity'
     if (activeView === 'focus') return 'Focus Timer'
     if (activeView === 'time-tracking') return 'Time Tracking'
@@ -855,12 +872,9 @@ export default function App() {
               projects={projects}
               activeView={activeView}
               onViewChange={handleViewChange}
-              onProjectsReorder={handleProjectsReorder}
-              onProjectCreate={handleProjectCreate}
-              onProjectUpdate={handleProjectUpdate}
-              onProjectDelete={handleProjectDelete}
               todayCount={todayCount}
               allTasksCount={allTasksCount}
+              pinnedVersion={pinnedVersion}
               user={user}
               onLogout={handleLogout}
               onShowOnboarding={() => setShowOnboarding(true)}
@@ -874,12 +888,9 @@ export default function App() {
               projects={projects}
               activeView={activeView}
               onViewChange={handleViewChange}
-              onProjectsReorder={handleProjectsReorder}
-              onProjectCreate={handleProjectCreate}
-              onProjectUpdate={handleProjectUpdate}
-              onProjectDelete={handleProjectDelete}
               todayCount={todayCount}
               allTasksCount={allTasksCount}
+              pinnedVersion={pinnedVersion}
               user={user}
               onLogout={handleLogout}
               onShowOnboarding={() => setShowOnboarding(true)}

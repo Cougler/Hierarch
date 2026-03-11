@@ -1,6 +1,6 @@
-# Flowki — Full App Recreation Prompt
+# Hierarch — Full App Recreation Prompt
 
-Build "Flowki," a visual-first task management web application using **React 18**, **Tailwind CSS v4**, **Motion (framer-motion)**, and **Supabase** (Auth, Database with custom tables, Storage, Edge Functions). The app uses **email/password authentication only** (no OAuth/social login). The term "Attachments" must always be referred to as **"Resources"** throughout the entire UI and codebase.
+Build "Hierarch," a visual-first task management web application using **React 18**, **Tailwind CSS v4**, **Motion (framer-motion)**, and **Supabase** (Auth, Database with custom tables, Storage, Edge Functions). The app uses **email/password authentication only** (no OAuth/social login). The term "Attachments" must always be referred to as **"Resources"** throughout the entire UI and codebase.
 
 ---
 
@@ -126,7 +126,7 @@ Server requirements:
 
 ## Authentication Flow
 
-1. **Login page** — Email/password sign-in via `supabase.auth.signInWithPassword()`. Has "Remember me" checkbox. Styled with backdrop blur, gradient effects, and the Flowki logo/branding.
+1. **Login page** — Email/password sign-in via `supabase.auth.signInWithPassword()`. Has "Remember me" checkbox. Styled with backdrop blur, gradient effects, and the Hierarch logo/branding.
 2. **Signup page** — Calls the server `/signup` endpoint, then auto-logs in via `signInWithPassword()`. Collects name, email, password.
 3. **Session management** — On app load, calls `supabase.auth.getSession()`. Listens to `onAuthStateChange` for `SIGNED_IN`, `SIGNED_OUT`, `USER_DELETED` events. If refresh token is invalid, auto-signs out.
 4. **Post-auth onboarding flow** (strict sequential gates):
@@ -139,7 +139,7 @@ Server requirements:
 ## Theming
 
 - **ThemeProvider** wraps the entire app, supports `dark`, `light`, `system` themes
-- Theme stored in `localStorage` under key `flowki-theme`
+- Theme stored in `localStorage` under key `hierarch-theme`
 - Default theme: `dark`
 - CSS custom properties define all colors (see theme details below)
 - Light theme: Clean zinc/white palette with `--primary: #0091BB` (teal/cyan)
@@ -295,7 +295,7 @@ The app is a **single-page application** with a sidebar + main content area. No 
 - Sets `user_metadata.has_seen_avatar` and `user_metadata.avatar_url` on completion
 
 ### Splash Screen
-- Full-screen loading screen with Flowki logo, animated spinner, "Loading Workspace..." text
+- Full-screen loading screen with Hierarch logo, animated spinner, "Loading Workspace..." text
 
 ### UpdateNotification
 - Fixed bottom-right toast that appears when the app detects a new version (via ETag polling every 2 minutes)
@@ -412,7 +412,7 @@ Default statuses:
 - `Cmd+,` (or `Ctrl+,`): Add new blank task
 
 ### Branding
-- App name: **Flowki**
+- App name: **Hierarch**
 - Tagline: "Build today, ship tomorrow." (login), "Design • Manage • Flow" (footer)
 - Logo hosted at: Supabase Storage public bucket
 - Primary color: Teal/Cyan (#0091BB light, #1EA5CF dark)

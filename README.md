@@ -1,4 +1,4 @@
-# Flowki — Visual-First Task Management
+# Hierarch — Visual-First Task Management
 
 A modern, visual-first task management web application built with React 18, Tailwind CSS v4, and Supabase.
 
@@ -25,7 +25,7 @@ A modern, visual-first task management web application built with React 18, Tail
 1. **Clone and install dependencies:**
 
 ```bash
-cd Flowki
+cd Hierarch
 npm install
 ```
 
@@ -69,6 +69,7 @@ supabase functions deploy server
 - **Rich Resources** — Create notes, meeting notes, research docs, and links with a rich text editor
 - **Focus Timer** — Built-in timer and stopwatch for time tracking
 - **Waiting For** — Track task dependencies and blockers
+- **Linear Integration** — Sync design issues with your team's Linear workspace
 - **Dark/Light/System Theme** — Beautiful theming with CSS custom properties
 - **Responsive Design** — Full mobile support with adaptive layouts
 - **Onboarding Flow** — Guided setup for new users
@@ -82,6 +83,7 @@ src/
     types.ts             — TypeScript interfaces
     supabase-client.ts   — Supabase client singleton
     api/data.ts          — Data access layer
+    api/linear.ts        — Linear GraphQL integration
     hooks/               — Custom React hooks
     lib/utils.ts         — Utility functions
     components/
@@ -97,6 +99,7 @@ src/
       TaskDetailsDrawer  — Task editor drawer
       TodayOverview.tsx  — Dashboard view
       ProjectDetails.tsx — Project page
+      LinearView.tsx     — Linear design board
       AttachmentsView    — Global resources
       ResourceEditor     — Resource create/edit
       RichTextEditor     — Tiptap editor

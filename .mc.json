@@ -3,5 +3,5 @@
   "status": "active",
   "stack": ["React", "TypeScript", "Tailwind CSS", "shadcn/ui", "Supabase"],
   "url": "https://hierarch.vercel.app",
-  "notes": "The Briefing overview page is fully overhauled with glass morphism styling, viewport-contained scrolling, and a project preview drawer that opens inline so users don't navigate away. Design notes are now a full system with a rich-text NoteDrawer (contentEditable with toolbar), note types (Freeform/Decision/Feedback/Research/Critique), and create-note buttons on task rows across all views. The resources tab in projects now uses a table layout matching the main resources page. Next: deploy these changes, build the Insights view, and continue the design cockpit vision."
+  "notes": "Overview page is polished and live — responsive two-column layout, unified activity feed (phase changes, notes, tasks, projects), project preview drawer, and all drawers close each other via centralized closeAllDrawers(). Linear issues now display as a table instead of kanban. Demo data and onboarding are rewritten with realistic projects and design-phase-focused content. Deployed to hierarchical.app. Next: build Insights view, continue design cockpit vision."
 }
