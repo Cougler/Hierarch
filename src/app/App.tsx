@@ -1023,7 +1023,7 @@ export default function App() {
           />
 
           {/* Mobile fallback drawers */}
-          {isMobile && selectedTask && drawerStack.length > 0 && drawerStack[drawerStack.length - 1].type === 'task' && (
+          {isMobile && selectedTask && drawerStack.length > 0 && drawerStack[drawerStack.length - 1]?.type === 'task' && (
             <TaskDetailsDrawer
               task={selectedTask}
               open={true}
@@ -1036,7 +1036,7 @@ export default function App() {
               onArtifactClick={pushDrawerArtifact}
             />
           )}
-          {isMobile && selectedArtifact && drawerStack.length > 0 && drawerStack[drawerStack.length - 1].type === 'artifact' && (
+          {isMobile && selectedArtifact && drawerStack.length > 0 && drawerStack[drawerStack.length - 1]?.type === 'artifact' && (
             <NoteDrawer
               note={selectedArtifact}
               open={true}

@@ -426,7 +426,7 @@ export function ArtifactsView({
             checked={filterTypes.includes(type)}
             onCheckedChange={() => toggleFilterType(type)}
           >
-            <Icon className={cn('mr-2 h-3.5 w-3.5', color)} />
+            {Icon && <Icon className={cn('mr-2 h-3.5 w-3.5', color)} />}
             {ARTIFACT_TYPE_LABELS[type]}
           </DropdownMenuCheckboxItem>
         );
