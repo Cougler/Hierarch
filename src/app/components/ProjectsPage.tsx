@@ -1,13 +1,14 @@
 import { useState, useRef, useEffect } from 'react'
 import { formatDistanceToNow } from 'date-fns'
-import { motion } from 'motion/react'
+import { motion, AnimatePresence } from 'motion/react'
 import { toast } from 'sonner'
 import {
   Plus, MoreHorizontal, Pencil, Copy, Trash2, FolderKanban,
-  Loader2, Pin, PinOff,
+  Loader2, Pin, PinOff, X,
 } from 'lucide-react'
 import { Button } from './ui/button'
 import { Input } from './ui/input'
+import { Textarea } from './ui/textarea'
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem,
   DropdownMenuSeparator, DropdownMenuTrigger,
@@ -16,11 +17,35 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from './ui/alert-dialog'
-import {
-  Dialog, DialogContent, DialogHeader, DialogTitle,
-} from './ui/dialog'
 import { cn } from '../lib/utils'
-import { IconPicker, getIconComponent } from './IconPicker'
+import { getIconComponent, PRESET_COLORS } from './IconPicker'
+import {
+  Folder, Star, Heart, Zap, Target, Rocket, Code, Book,
+  Music, Camera, Globe, Shield, Award, Flag, Bookmark,
+  Coffee, Compass, Feather, Gift, Key, Layers, Map,
+  Palette, Sun, Moon,
+} from 'lucide-react'
+import type { LucideIcon } from 'lucide-react'
+
+const ICON_MAP: Record<string, LucideIcon> = {
+  Folder, Star, Heart, Zap, Target, Rocket, Code, Book,
+  Music, Camera, Globe, Shield, Award, Flag, Bookmark,
+  Coffee, Compass, Feather, Gift, Key, Layers, Map,
+  Palette, Sun, Moon,
+}
+const ICON_NAMES = Object.keys(ICON_MAP)
+
+function resolveHex(color?: string): string {
+  if (!color) return '#3b82f6'
+  if (color.startsWith('#')) return color
+  const legacyMap: Record<string, string> = {
+    'bg-slate-500': '#64748b', 'bg-red-500': '#ef4444',
+    'bg-orange-500': '#f97316', 'bg-amber-500': '#f59e0b',
+    'bg-emerald-500': '#10b981', 'bg-blue-500': '#3b82f6',
+    'bg-violet-500': '#8b5cf6', 'bg-pink-500': '#ec4899',
+  }
+  return legacyMap[color] || '#3b82f6'
+}
 import type { Project, Task, ProjectMetadata } from '../types'
 
 const PINNED_KEY = 'hierarch-pinned-projects'
@@ -108,7 +133,6 @@ export function ProjectsPage({
             <FolderKanban className="h-3.5 w-3.5 text-primary" />
           </div>
           <span className="font-semibold text-sm">Projects</span>
-          <span className="text-xs text-muted-foreground">{realProjects.length} projects</span>
         </div>
 
         <Button variant="outline" size="sm" className="gap-1.5 h-8" onClick={() => setShowCreate(true)}>
@@ -169,7 +193,7 @@ export function ProjectsPage({
                     key={project.id}
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
-                    onClick={() => onViewChange(`project:${project.name}`)}
+                    onClick={() => onViewChange(`project:${project.id}`)}
                     className="group/row border-b border-border/40 hover:bg-accent/20 cursor-pointer transition-colors"
                   >
                     <td className="px-6 py-3">
@@ -232,17 +256,16 @@ export function ProjectsPage({
         </table>
       </div>
 
-      {/* Create dialog */}
-      {showCreate && (
-        <CreateProjectDialog
-          onClose={() => setShowCreate(false)}
-          onCreate={(name, metadata) => {
-            onProjectCreate(name, metadata)
-            setShowCreate(false)
-          }}
-          projectCount={realProjects.length}
-        />
-      )}
+      {/* Create drawer */}
+      <NewProjectDrawer
+        open={showCreate}
+        onOpenChange={setShowCreate}
+        onCreate={(name, metadata) => {
+          onProjectCreate(name, metadata)
+          setShowCreate(false)
+        }}
+        projectCount={realProjects.length}
+      />
 
       {/* Delete confirmation */}
       <AlertDialog open={!!deleteTarget} onOpenChange={open => !open && setDeleteTarget(null)}>
@@ -268,53 +291,147 @@ export function ProjectsPage({
   )
 }
 
-function CreateProjectDialog({
-  onClose,
+function NewProjectDrawer({
+  open,
+  onOpenChange,
   onCreate,
   projectCount,
 }: {
-  onClose: () => void
+  open: boolean
+  onOpenChange: (open: boolean) => void
   onCreate: (name: string, metadata?: ProjectMetadata) => void
   projectCount: number
 }) {
   const [name, setName] = useState('')
   const [icon, setIcon] = useState('Folder')
-  const [color, setColor] = useState('bg-blue-500')
+  const [color, setColor] = useState('#3b82f6')
+  const [description, setDescription] = useState('')
+  const nameRef = useRef<HTMLInputElement>(null)
+
+  useEffect(() => {
+    if (open) {
+      setName('')
+      setIcon('Folder')
+      setColor('#3b82f6')
+      setDescription('')
+      setTimeout(() => nameRef.current?.focus(), 50)
+    }
+  }, [open])
 
   const handleCreate = () => {
     if (!name.trim()) return
-    onCreate(name.trim(), { icon, color, order: projectCount })
+    onCreate(name.trim(), { icon, color, order: projectCount, description: description.trim() || undefined })
     toast.success('Project created')
   }
 
+  const SelectedIcon = ICON_MAP[icon] || Folder
+
   return (
-    <Dialog open onOpenChange={open => !open && onClose()}>
-      <DialogContent className="max-w-sm">
-        <DialogHeader>
-          <DialogTitle>New Project</DialogTitle>
-        </DialogHeader>
-        <div className="space-y-4 mt-2">
-          <div className="flex items-center gap-3">
-            <IconPicker
-              value={icon}
-              color={color}
-              onChange={(i, c) => { setIcon(i); setColor(c) }}
-            />
-            <Input
-              placeholder="Project name…"
-              value={name}
-              onChange={e => setName(e.target.value)}
-              onKeyDown={e => e.key === 'Enter' && handleCreate()}
-              autoFocus
-              className="flex-1"
-            />
-          </div>
-          <div className="flex justify-end gap-2">
-            <Button variant="outline" onClick={onClose}>Cancel</Button>
-            <Button onClick={handleCreate} disabled={!name.trim()}>Create</Button>
-          </div>
-        </div>
-      </DialogContent>
-    </Dialog>
+    <AnimatePresence>
+      {open && (
+        <>
+          {/* Close button */}
+          <motion.button
+            key="new-project-close"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.15 }}
+            onClick={() => onOpenChange(false)}
+            className="fixed top-8 right-[448px] z-50 flex h-8 w-8 items-center justify-center rounded-full bg-white/[0.06] text-muted-foreground shadow-lg border border-white/[0.08] hover:bg-white/[0.12] hover:text-foreground transition-colors"
+          >
+            <X className="h-3.5 w-3.5" />
+          </motion.button>
+
+          {/* Panel */}
+          <motion.div
+            key="new-project-drawer"
+            initial={{ opacity: 0, scale: 0.88 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.88 }}
+            transition={{ type: 'spring', stiffness: 420, damping: 32, mass: 0.7 }}
+            style={{ backgroundColor: '#1c1c1a', transformOrigin: 'top right' }}
+            className="fixed top-8 right-8 bottom-8 z-50 w-[408px] rounded-2xl shadow-2xl border border-white/[0.08] flex flex-col overflow-hidden"
+          >
+            <div className="flex-1 flex flex-col gap-4 p-5 overflow-auto">
+              <h3 className="text-sm font-semibold text-foreground">New project</h3>
+
+              {/* Name */}
+              <Input
+                ref={nameRef}
+                placeholder="Project name"
+                value={name}
+                onChange={e => setName(e.target.value)}
+                onKeyDown={e => e.key === 'Enter' && handleCreate()}
+                className="bg-white/[0.04] border-white/[0.08] text-sm placeholder:text-muted-foreground/50 focus-visible:ring-white/20"
+              />
+
+              {/* Description */}
+              <Textarea
+                placeholder="Description (optional)"
+                value={description}
+                onChange={e => setDescription(e.target.value)}
+                className="min-h-[100px] resize-none bg-white/[0.04] border-white/[0.08] text-sm placeholder:text-muted-foreground/50 focus-visible:ring-white/20"
+              />
+
+              {/* Icon */}
+              <div className="space-y-2">
+                <label className="text-[11px] text-muted-foreground/70">Icon</label>
+                <div className="grid grid-cols-8 gap-1">
+                  {ICON_NAMES.map(name => {
+                    const Icon = ICON_MAP[name]
+                    if (!Icon) return null
+                    return (
+                      <button
+                        key={name}
+                        onClick={() => setIcon(name)}
+                        className={cn(
+                          'flex h-8 w-8 items-center justify-center rounded-md transition-colors',
+                          icon === name
+                            ? 'bg-white/[0.1] text-foreground'
+                            : 'text-muted-foreground/60 hover:bg-white/[0.06] hover:text-foreground',
+                        )}
+                      >
+                        <Icon className="h-4 w-4" style={icon === name ? { color } : undefined} />
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+
+              {/* Color */}
+              <div className="space-y-2">
+                <label className="text-[11px] text-muted-foreground/70">Color</label>
+                <div className="flex items-center gap-2">
+                  {PRESET_COLORS.map(({ name: colorName, hex }) => (
+                    <button
+                      key={colorName}
+                      onClick={() => setColor(hex)}
+                      title={colorName}
+                      className="h-6 w-6 rounded-full transition-transform hover:scale-110 focus:outline-none"
+                      style={{
+                        backgroundColor: hex,
+                        boxShadow: color === hex
+                          ? `0 0 0 2px #1c1c1a, 0 0 0 3.5px ${hex}`
+                          : 'none',
+                      }}
+                    />
+                  ))}
+                </div>
+              </div>
+
+              {/* Create button */}
+              <Button
+                onClick={handleCreate}
+                disabled={!name.trim()}
+                className="w-full bg-[#bf7535] hover:bg-[#bf7535]/90 text-white disabled:opacity-40"
+              >
+                Create Project
+              </Button>
+            </div>
+          </motion.div>
+        </>
+      )}
+    </AnimatePresence>
   )
 }

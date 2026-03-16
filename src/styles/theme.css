@@ -80,7 +80,7 @@
   --sidebar-foreground: #EAE7E1;
 }
 
-/* ─── Scrollbar ─── */
+/* ─── Scrollbar (hidden until scrolling) ─── */
 ::-webkit-scrollbar {
   width: 5px;
   height: 5px;
@@ -91,8 +91,13 @@
 }
 
 ::-webkit-scrollbar-thumb {
-  background: var(--border);
+  background: transparent;
   border-radius: 10px;
+  transition: background 0.3s;
+}
+
+*:hover::-webkit-scrollbar-thumb {
+  background: var(--border);
 }
 
 ::-webkit-scrollbar-thumb:hover {
@@ -101,23 +106,11 @@
 
 * {
   scrollbar-width: thin;
-  scrollbar-color: var(--border) transparent;
-}
-
-/* ─── Auto-hide scrollbar (fade on hover) ─── */
-.scrollbar-auto-hide {
-  scrollbar-width: thin;
   scrollbar-color: transparent transparent;
 }
-.scrollbar-auto-hide::-webkit-scrollbar-thumb {
-  background: transparent;
-  transition: background 0.2s;
-}
-.scrollbar-auto-hide:hover {
+
+*:hover {
   scrollbar-color: var(--border) transparent;
-}
-.scrollbar-auto-hide:hover::-webkit-scrollbar-thumb {
-  background: var(--border);
 }
 
 /* ─── Contenteditable placeholder ─── */

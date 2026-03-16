@@ -105,7 +105,7 @@ export function AccountSettings({ user, onAvatarChange, onAccountDeleted }: Acco
       );
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
-        throw new Error(body.message || 'Failed to delete account');
+        throw new Error(body.error || 'Failed to delete account');
       }
       toast.success('Account deleted');
       onAccountDeleted();

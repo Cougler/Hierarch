@@ -81,12 +81,14 @@ export function ProjectDetailsDrawer({
           {/* Close button */}
           <motion.button
             key="proj-details-close"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.15 }}
+            initial={{ opacity: 0, x: 40 }}
+            animate={{ opacity: 0.85, x: 0 }}
+            exit={{ opacity: 0, x: 40, transition: { type: 'spring', stiffness: 420, damping: 32, mass: 0.7 } }}
+            whileHover={{ opacity: 1 }}
+            transition={{ delay: 0.25, type: 'spring', stiffness: 320, damping: 28 }}
             onClick={() => onOpenChange(false)}
-            className="fixed top-[50px] right-[462px] z-50 flex h-8 w-8 items-center justify-center rounded-full bg-white/[0.06] text-muted-foreground shadow-lg border border-white/[0.08] hover:bg-white/[0.12] hover:text-foreground transition-colors"
+            style={{ backgroundColor: '#1c1c1a' }}
+            className="fixed top-8 right-[460px] z-50 flex h-[60px] w-8 items-center justify-center rounded-full text-muted-foreground shadow-lg border border-white/[0.08] hover:text-foreground transition-colors"
           >
             <X className="h-3.5 w-3.5" />
           </motion.button>
@@ -99,7 +101,7 @@ export function ProjectDetailsDrawer({
             exit={{ opacity: 0, scale: 0.88 }}
             transition={{ type: 'spring', stiffness: 420, damping: 32, mass: 0.7 }}
             style={{ backgroundColor: '#1c1c1a', transformOrigin: 'top right' }}
-            className="fixed top-[50px] right-[30px] z-50 w-[420px] max-h-[calc(100vh-60px)] rounded-2xl shadow-2xl border border-white/[0.08] flex flex-col overflow-hidden"
+            className="fixed top-8 right-8 bottom-8 z-50 w-[420px] rounded-2xl shadow-2xl border border-white/[0.08] flex flex-col overflow-hidden"
           >
             <div className="flex flex-col gap-5 p-5 overflow-auto flex-1">
               <h3 className="text-sm font-semibold text-foreground">Project details</h3>

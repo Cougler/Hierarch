@@ -78,7 +78,7 @@ export function IconPicker({ value = 'Folder', color, onChange }: IconPickerProp
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
-        <Button variant="outline" size="icon" className="h-8 w-8 shrink-0">
+        <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0">
           <CurrentIcon className="h-4 w-4" style={{ color: selectedColor }} />
         </Button>
       </PopoverTrigger>

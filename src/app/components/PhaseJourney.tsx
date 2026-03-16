@@ -1,6 +1,7 @@
 import { useState } from 'react'
-import { format } from 'date-fns'
+import { formatDistanceToNow } from 'date-fns'
 import type { PhaseTransition, StatusConfig } from '../types'
+import type { Artifact } from './NoteDrawer'
 
 const BG_TO_HEX: Record<string, string> = {
   'bg-violet-500': '#8b5cf6',
@@ -28,9 +29,12 @@ interface PhaseJourneyProps {
   statuses: StatusConfig[]
   currentPhase: string
   maxItems?: number
+  taskId?: string
+  artifacts?: Artifact[]
+  onArtifactClick?: (note: Artifact) => void
 }
 
-export function PhaseJourney({ phaseHistory, statuses, currentPhase, maxItems = 4 }: PhaseJourneyProps) {
+export function PhaseJourney({ phaseHistory, statuses, currentPhase, maxItems = 4, taskId, artifacts, onArtifactClick }: PhaseJourneyProps) {
   const statusMap = new Map(statuses.map(s => [s.id, s]))
   const [expanded, setExpanded] = useState(false)
 
@@ -38,7 +42,7 @@ export function PhaseJourney({ phaseHistory, statuses, currentPhase, maxItems = 
     const current = statusMap.get(currentPhase)
     return (
       <div className="text-xs text-muted-foreground/50 italic py-1">
-        No history yet — currently in {current?.title ?? currentPhase}
+        Started in {current?.title ?? currentPhase}
       </div>
     )
   }
@@ -52,10 +56,25 @@ export function PhaseJourney({ phaseHistory, statuses, currentPhase, maxItems = 
     <div className="space-y-0">
       {visible.map((transition, i) => {
         const toPhase = statusMap.get(transition.toPhase)
-        const fromPhase = statusMap.get(transition.fromPhase)
+        const isFeedback = toPhase?.isFeedback
+        const isDone = toPhase?.isDone
         const color = toPhase ? (BG_TO_HEX[toPhase.color] ?? '#64748b') : '#64748b'
-        const ts = new Date(transition.timestamp)
         const isFirst = i === 0
+
+        // Build natural language description
+        let label: string
+        if (isDone) {
+          label = `Handed off`
+        } else if (isFeedback) {
+          label = `Moved to feedback`
+        } else {
+          label = `Moved to ${toPhase?.title ?? transition.toPhase}`
+        }
+
+        // Find linked feedback note for this task
+        const linkedNote = isFeedback && taskId && artifacts
+          ? artifacts.find(n => n.taskId === taskId && n.type === 'feedback')
+          : undefined
 
         return (
           <div key={transition.id} className="flex gap-2.5 py-1.5">
@@ -75,36 +94,19 @@ export function PhaseJourney({ phaseHistory, statuses, currentPhase, maxItems = 
 
             {/* Content */}
             <div className="flex-1 min-w-0 pb-1">
-              <div className="flex items-baseline gap-1.5">
-                <span className="text-xs font-medium" style={{ color }}>
-                  {toPhase?.title ?? transition.toPhase}
-                </span>
-                {fromPhase && (
-                  <span className="text-[10px] text-muted-foreground/50">
-                    from {fromPhase.title ?? transition.fromPhase}
-                  </span>
+              <p className="text-xs text-foreground/80">
+                {label}
+                {linkedNote && onArtifactClick && (
+                  <> with <span
+                    role="link"
+                    onClick={(e) => { e.stopPropagation(); onArtifactClick(linkedNote) }}
+                    className="text-primary hover:underline cursor-pointer"
+                  >note</span></>
                 )}
-              </div>
-              <div className="flex items-center gap-2 mt-0.5">
-                <span className="text-[10px] text-muted-foreground/40">
-                  {format(ts, 'MMM d, h:mm a')}
-                </span>
-                {transition.reviewer && (
-                  <span className="text-[10px] text-orange-400/70">
-                    Feedback from {transition.reviewer}
-                  </span>
-                )}
-                {transition.deadline && (
-                  <span className="text-[10px] text-muted-foreground/40">
-                    Due {format(new Date(transition.deadline), 'MMM d')}
-                  </span>
-                )}
-              </div>
-              {transition.notes && (
-                <p className="text-[10px] text-muted-foreground/60 mt-1 leading-relaxed whitespace-pre-wrap">
-                  {transition.notes}
-                </p>
-              )}
+              </p>
+              <span className="text-[10px] text-muted-foreground/40">
+                {formatDistanceToNow(new Date(transition.timestamp), { addSuffix: true })}
+              </span>
             </div>
           </div>
         )

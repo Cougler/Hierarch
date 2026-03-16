@@ -223,7 +223,7 @@ export function CapacityView({ projects, tasks, onProjectClick }: CapacityViewPr
                       top: '50%',
                       transform: 'translateY(-50%)',
                     }}
-                    onClick={() => onProjectClick(project.name)}
+                    onClick={() => onProjectClick(project.id)}
                   >
                     {/* Project label above the bar */}
                     <div className="flex items-center gap-1 px-0.5 mb-1 select-none pointer-events-none">

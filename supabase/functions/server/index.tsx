@@ -23,7 +23,7 @@ async function getAuthUser(req: Request) {
   return user
 }
 
-const app = new Hono()
+const app = new Hono().basePath("/server")
 
 app.use("*", cors())
 app.use("*", logger())

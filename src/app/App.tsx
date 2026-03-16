@@ -2,10 +2,10 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { AnimatePresence, motion } from 'motion/react'
 import { Toaster, toast } from 'sonner'
 import { supabase } from './supabase-client'
-import type { Task, Project, Resource, StatusConfig, TimeEntry, WaitingForItem, PhaseTransition } from './types'
+import type { Task, Project, StatusConfig, TimeEntry, WaitingForItem, PhaseTransition } from './types'
 import { DEFAULT_STATUSES } from './types'
 import * as api from './api/data'
-import { DEMO_USER, DEMO_PROJECTS, DEMO_TASKS, DEMO_RESOURCES, DEMO_TIME_ENTRIES, DEMO_DESIGN_NOTES } from './demo-data'
+import { DEMO_USER, DEMO_PROJECTS, DEMO_TASKS, DEMO_TIME_ENTRIES, DEMO_DESIGN_NOTES, STARTER_PROJECTS, STARTER_TASKS, STARTER_DESIGN_NOTES } from './demo-data'
 import { ThemeProvider } from './components/ThemeProvider'
 import { TooltipProvider } from './components/ui/tooltip'
 import { useIsMobile } from './hooks/use-mobile'
@@ -21,7 +21,7 @@ import { TaskBoard } from './components/TaskBoard'
 import { TaskDetailsDrawer } from './components/TaskDetailsDrawer'
 import { NewTaskDrawer } from './components/NewTaskDrawer'
 import { ProjectDetails } from './components/ProjectDetails'
-import { AttachmentsView } from './components/AttachmentsView'
+import { ArtifactsView } from './components/ArtifactsView'
 import { TimeTrackingView } from './components/TimeTrackingView'
 import { FigmaView } from './components/FigmaView'
 import { AppsDashboard } from './components/AppsDashboard'
@@ -31,10 +31,11 @@ import { UpdateNotification } from './components/UpdateNotification'
 import { CapacityView } from './components/CapacityView'
 import { FocusTimerView } from './components/FocusTimerView'
 import { LinearView } from './components/LinearView'
-import { ProjectsPage } from './components/ProjectsPage'
-import { FeedbackPrompt } from './components/FeedbackPrompt'
+import { IntegrationsPage } from './components/IntegrationsPage'
 import { NoteDrawer } from './components/NoteDrawer'
-import type { DesignNote } from './components/NoteDrawer'
+import type { Artifact } from './components/NoteDrawer'
+import { UnifiedDrawer } from './components/UnifiedDrawer'
+import type { DrawerFrame } from './components/UnifiedDrawer'
 
 type AuthState = 'loading' | 'unauthenticated' | 'onboarding' | 'authenticated'
 type AuthView = 'login' | 'signup'
@@ -53,31 +54,40 @@ export default function App() {
 
   const [projects, setProjects] = useState<Project[]>([])
   const [tasks, setTasks] = useState<Task[]>([])
-  const [resources, setResources] = useState<Resource[]>([])
   const [timeEntries, setTimeEntries] = useState<TimeEntry[]>([])
   const [statuses, setStatuses] = useState<StatusConfig[]>(() => {
     const saved = localStorage.getItem('hierarch-statuses')
-    return saved ? JSON.parse(saved) : DEFAULT_STATUSES
+    if (!saved) return DEFAULT_STATUSES
+    const parsed: StatusConfig[] = JSON.parse(saved)
+    // Reset to defaults if saved statuses don't match current phase IDs
+    const defaultIds = new Set(DEFAULT_STATUSES.map(s => s.id))
+    const savedIds = new Set(parsed.map(s => s.id))
+    if (DEFAULT_STATUSES.some(s => !savedIds.has(s.id)) || parsed.some(s => !defaultIds.has(s.id))) {
+      localStorage.setItem('hierarch-statuses', JSON.stringify(DEFAULT_STATUSES))
+      return DEFAULT_STATUSES
+    }
+    return parsed
   })
   const [showProjectIcons, setShowProjectIcons] = useState(() => {
     return localStorage.getItem('hierarch-show-project-icons') !== 'false'
   })
 
   const [selectedTask, setSelectedTask] = useState<Task | null>(null)
-  const [taskDrawerOpen, setTaskDrawerOpen] = useState(false)
+
+  // Drawer navigation stack — tracks history for back navigation
+  const [drawerStack, setDrawerStack] = useState<DrawerFrame[]>([])
+  const [drawerDirection, setDrawerDirection] = useState<1 | -1>(1)
   const [newTaskDrawerOpen, setNewTaskDrawerOpen] = useState(false)
   const [newTaskDefaultProjectId, setNewTaskDefaultProjectId] = useState<string | undefined>(undefined)
   const [showOnboarding, setShowOnboarding] = useState(false)
   const [demoMode, setDemoMode] = useState(false)
-  const [feedbackPrompt, setFeedbackPrompt] = useState<{ taskId: string; fromPhase: string } | null>(null)
   const [focusTask, setFocusTask] = useState<Task | null>(null)
-  const [pinnedVersion, setPinnedVersion] = useState(0)
 
-  // Design notes
-  const [designNotes, setDesignNotes] = useState<DesignNote[]>(() => {
-    const saved = localStorage.getItem('hierarch-design-notes')
+  // Artifacts
+  const [artifacts, setArtifacts] = useState<Artifact[]>(() => {
+    // Check new key first, fall back to old key for migration
+    const saved = localStorage.getItem('hierarch-artifacts') || localStorage.getItem('hierarch-artifacts')
     if (!saved) return []
-    // Migrate old notes format
     const parsed = JSON.parse(saved)
     return parsed.map((n: any) => ({
       ...n,
@@ -86,8 +96,7 @@ export default function App() {
       updatedAt: n.updatedAt || n.timestamp,
     }))
   })
-  const [selectedNote, setSelectedNote] = useState<DesignNote | null>(null)
-  const [noteDrawerOpen, setNoteDrawerOpen] = useState(false)
+  const [selectedArtifact, setSelectedArtifact] = useState<Artifact | null>(null)
   const [previewProject, setPreviewProject] = useState<Project | null>(null)
 
   const tempIdMapping = useRef<Record<string, string>>({})
@@ -99,9 +108,9 @@ export default function App() {
     setUser(DEMO_USER)
     setProjects([...DEMO_PROJECTS])
     setTasks([...DEMO_TASKS])
-    setResources([...DEMO_RESOURCES])
+
     setTimeEntries([...DEMO_TIME_ENTRIES])
-    setDesignNotes([...DEMO_DESIGN_NOTES])
+    setArtifacts([...DEMO_DESIGN_NOTES])
     setDataLoading(false)
     setAuthState('onboarding')
   }
@@ -111,9 +120,9 @@ export default function App() {
     setUser(DEMO_USER)
     setProjects([...DEMO_PROJECTS])
     setTasks([...DEMO_TASKS])
-    setResources([...DEMO_RESOURCES])
+
     setTimeEntries([...DEMO_TIME_ENTRIES])
-    setDesignNotes([...DEMO_DESIGN_NOTES])
+    setArtifacts([...DEMO_DESIGN_NOTES])
     setDataLoading(false)
     setAuthState('authenticated')
   }
@@ -172,11 +181,10 @@ export default function App() {
   const resetAppState = () => {
     setProjects([])
     setTasks([])
-    setResources([])
     setTimeEntries([])
     setActiveView('today')
     setSelectedTask(null)
-    setTaskDrawerOpen(false)
+    setDrawerStack([])
   }
 
   // Load data when authenticated
@@ -188,16 +196,69 @@ export default function App() {
   const loadData = async () => {
     if (demoMode) { setDataLoading(false); return }
     setDataLoading(true)
-    const [projectsData, tasksData, resourcesData] = await Promise.all([
+    const [projectsData, tasksData] = await Promise.all([
       api.getProjects(),
       api.getTasks(),
-      api.getResources(),
+    ])
+
+    // Seed starter data for brand-new accounts
+    if ((!projectsData || projectsData.length === 0) && (!tasksData || tasksData.length === 0)) {
+      await seedStarterData()
+      setDataLoading(false)
+      loadTimeEntries()
+      return
+    }
+
+    if (projectsData) setProjects(projectsData)
+    if (tasksData) setTasks(tasksData)
+    setDataLoading(false)
+    loadTimeEntries()
+  }
+
+  const seedStarterData = async () => {
+    // Create projects and get back real UUIDs
+    const projectMap: Record<string, string> = {}
+    for (const dp of STARTER_PROJECTS) {
+      const created = await api.createProject(
+        dp.name,
+        dp.metadata,
+        dp.metadata?.start_date,
+        dp.metadata?.end_date,
+        dp.description
+      )
+      if (created) projectMap[dp.id] = created.id
+    }
+
+    // Create tasks, mapping demo project/task IDs to real UUIDs
+    const taskMap: Record<string, string> = {}
+    for (const dt of STARTER_TASKS) {
+      const realProjectId = dt.project ? projectMap[dt.project] : undefined
+      const created = await api.createTask(
+        { ...dt, project: realProjectId },
+        realProjectId
+      )
+      if (created) taskMap[dt.id] = created.id
+    }
+
+    // Seed design notes into localStorage
+    const savedNotes = localStorage.getItem('hierarch-artifacts')
+    if (!savedNotes || JSON.parse(savedNotes).length === 0) {
+      const seededNotes = STARTER_DESIGN_NOTES.map(n => ({
+        ...n,
+        projectId: n.projectId ? (projectMap[n.projectId] || n.projectId) : undefined,
+        taskId: n.taskId ? (taskMap[n.taskId] || n.taskId) : undefined,
+      }))
+      localStorage.setItem('hierarch-artifacts', JSON.stringify(seededNotes))
+      setArtifacts(seededNotes)
+    }
+
+    // Reload from DB to get canonical state
+    const [projectsData, tasksData] = await Promise.all([
+      api.getProjects(),
+      api.getTasks(),
     ])
     if (projectsData) setProjects(projectsData)
     if (tasksData) setTasks(tasksData)
-    if (resourcesData) setResources(resourcesData)
-    setDataLoading(false)
-    loadTimeEntries()
   }
 
   const loadTimeEntries = async () => {
@@ -348,10 +409,29 @@ export default function App() {
         const history = [...(currentTask.phaseHistory ?? []), transition]
         updates = { ...updates, phaseHistory: history }
 
-        // Check if entering a feedback phase
+        // If entering a feedback phase, auto-create a feedback note and open it
         const targetPhase = statuses.find(s => s.id === updates.status)
         if (targetPhase?.isFeedback) {
-          setFeedbackPrompt({ taskId: id, fromPhase: currentTask.status })
+          const artifact: Artifact = {
+            id: `dn-${Date.now()}`,
+            title: `Feedback: ${currentTask.title}`,
+            text: '',
+            type: 'feedback',
+            projectId: currentTask.project || undefined,
+            taskId: id,
+            timestamp: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+          }
+          setArtifacts(prev => [artifact, ...prev])
+          // Push artifact onto stack if a drawer is open
+          if (drawerStack.length > 0) {
+            pushDrawerArtifact(artifact)
+          } else {
+            closeAllDrawers()
+            setSelectedArtifact(artifact)
+            setDrawerDirection(1)
+            setDrawerStack([{ type: 'artifact', artifactId: artifact.id }])
+          }
         }
       }
     }
@@ -367,31 +447,12 @@ export default function App() {
     if (!result) toast.error('Failed to update task')
   }
 
-  const handleFeedbackConfirm = (reviewer: string, deadline: string, notes: string) => {
-    if (!feedbackPrompt) return
-    const task = tasks.find(t => t.id === feedbackPrompt.taskId)
-    if (task?.phaseHistory) {
-      const history = [...task.phaseHistory]
-      const lastEntry = history[history.length - 1]
-      if (lastEntry) {
-        lastEntry.reviewer = reviewer || undefined
-        lastEntry.deadline = deadline || undefined
-        lastEntry.notes = notes || undefined
-      }
-      handleTaskUpdate(feedbackPrompt.taskId, { phaseHistory: history })
-    }
-    setFeedbackPrompt(null)
-  }
-
-  const handleFeedbackSkip = () => {
-    setFeedbackPrompt(null)
-  }
 
   const handleTaskDelete = async (id: string) => {
     setTasks(prev => prev.filter(t => t.id !== id))
     if (selectedTask?.id === id) {
       setSelectedTask(null)
-      setTaskDrawerOpen(false)
+      closeAllDrawers()
     }
     if (demoMode) { toast.success('Task deleted'); return }
 
@@ -402,74 +463,27 @@ export default function App() {
   }
 
   const closeAllDrawers = () => {
-    setTaskDrawerOpen(false)
     setNewTaskDrawerOpen(false)
-    setNoteDrawerOpen(false)
+    setDrawerStack([])
+    setSelectedTask(null)
+    setSelectedArtifact(null)
     setPreviewProject(null)
   }
 
   const handleTaskClick = (task: Task) => {
     closeAllDrawers()
     setSelectedTask(task)
-    setTaskDrawerOpen(true)
+    setDrawerDirection(1)
+    setDrawerStack([{ type: 'task', taskId: task.id }])
   }
 
-  // Resource operations
-  const handleResourceCreate = async (resourceData: Partial<Resource>) => {
-    const tempId = Math.random().toString(36).substr(2, 9)
-    const newResource: Resource = {
-      id: tempId,
-      type: resourceData.type || 'Project Note',
-      title: resourceData.title || '',
-      content: resourceData.content,
-      projectId: resourceData.projectId,
-      taskId: resourceData.taskId,
-      createdAt: new Date().toISOString(),
-      pinned: resourceData.pinned || false,
-      order: resources.length,
-      metadata: resourceData.metadata,
-    }
-
-    setResources(prev => [...prev, newResource])
-    if (demoMode) return
-
-    const projectId = resourceData.projectId
-      ? projects.find(p => p.name === resourceData.projectId)?.id || resourceData.projectId
-      : undefined
-
-    const result = await api.createResource(newResource, projectId)
-    if (result) {
-      setResources(prev => prev.map(r => r.id === tempId ? { ...r, id: result.id } : r))
-    } else {
-      toast.error('Failed to create resource')
-      setResources(prev => prev.filter(r => r.id !== tempId))
-    }
-  }
-
-  const handleResourceUpdate = async (id: string, updates: Partial<Resource>) => {
-    setResources(prev => prev.map(r => r.id === id ? { ...r, ...updates } : r))
-    if (demoMode) return
-
-    const result = await api.updateResource(id, updates)
-    if (!result) toast.error('Failed to update resource')
-  }
-
-  const handleResourceDelete = async (id: string) => {
-    setResources(prev => prev.filter(r => r.id !== id))
-    if (demoMode) { toast.success('Resource deleted'); return }
-
-    const result = await api.deleteResource(id)
-    if (!result) toast.error('Failed to delete resource')
-    else toast.success('Resource deleted')
-  }
-
-  // Design note operations
+  // Artifact operations
   useEffect(() => {
-    localStorage.setItem('hierarch-design-notes', JSON.stringify(designNotes))
-  }, [designNotes])
+    localStorage.setItem('hierarch-artifacts', JSON.stringify(artifacts))
+  }, [artifacts])
 
-  const handleNoteCreate = (projectId: string) => {
-    const note: DesignNote = {
+  const handleArtifactCreate = (projectId: string) => {
+    const artifact: Artifact = {
       id: `dn-${Date.now()}`,
       title: '',
       text: '',
@@ -478,28 +492,65 @@ export default function App() {
       timestamp: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     }
-    setDesignNotes(prev => [note, ...prev])
+    setArtifacts(prev => [artifact, ...prev])
     closeAllDrawers()
-    setSelectedNote(note)
-    setNoteDrawerOpen(true)
+    setSelectedArtifact(artifact)
+    setDrawerDirection(1)
+    setDrawerStack([{ type: 'artifact', artifactId: artifact.id }])
   }
 
-  const handleNoteClick = (note: DesignNote) => {
+  const handleArtifactClick = (artifact: Artifact) => {
     closeAllDrawers()
-    setSelectedNote(note)
-    setNoteDrawerOpen(true)
+    setSelectedArtifact(artifact)
+    setDrawerDirection(1)
+    setDrawerStack([{ type: 'artifact', artifactId: artifact.id }])
   }
 
-  const handleNoteUpdate = (id: string, updates: Partial<DesignNote>) => {
-    setDesignNotes(prev => prev.map(n => n.id === id ? { ...n, ...updates } : n))
-    if (selectedNote?.id === id) {
-      setSelectedNote(prev => prev ? { ...prev, ...updates } : prev)
+  // Push a drawer onto the stack (navigating deeper from current drawer)
+  const pushDrawerTask = (task: Task) => {
+    setSelectedTask(task)
+    setDrawerDirection(1)
+    setDrawerStack(prev => [...prev, { type: 'task', taskId: task.id }])
+  }
+
+  const pushDrawerArtifact = (artifact: Artifact) => {
+    setSelectedArtifact(artifact)
+    setDrawerDirection(1)
+    setDrawerStack(prev => [...prev, { type: 'artifact', artifactId: artifact.id }])
+  }
+
+  const handleDrawerBack = () => {
+    if (drawerStack.length <= 1) return
+    const newStack = drawerStack.slice(0, -1)
+    const prev = newStack[newStack.length - 1]!
+
+    setDrawerDirection(-1)
+
+    // Restore previous frame's data
+    if (prev.type === 'project') {
+      const project = projects.find(p => p.id === prev.projectId)
+      if (project) setPreviewProject(project)
+    } else if (prev.type === 'task') {
+      const task = tasks.find(t => t.id === prev.taskId)
+      if (task) setSelectedTask(task)
+    } else if (prev.type === 'artifact') {
+      const artifact = artifacts.find(a => a.id === prev.artifactId)
+      if (artifact) setSelectedArtifact(artifact)
+    }
+
+    setDrawerStack(newStack)
+  }
+
+  const handleArtifactUpdate = (id: string, updates: Partial<Artifact>) => {
+    setArtifacts(prev => prev.map(n => n.id === id ? { ...n, ...updates } : n))
+    if (selectedArtifact?.id === id) {
+      setSelectedArtifact(prev => prev ? { ...prev, ...updates } : prev)
     }
   }
 
-  const handleNoteDelete = (id: string) => {
-    setDesignNotes(prev => prev.filter(n => n.id !== id))
-    if (selectedNote?.id === id) setSelectedNote(null)
+  const handleArtifactDelete = (id: string) => {
+    setArtifacts(prev => prev.filter(n => n.id !== id))
+    if (selectedArtifact?.id === id) setSelectedArtifact(null)
   }
 
   // Time entry operations
@@ -661,19 +712,23 @@ export default function App() {
           onTaskCreate={handleTaskCreate}
           onViewChange={handleViewChange}
           onNewTask={() => handleOpenNewTask()}
-          designNotes={designNotes}
-          onNoteCreate={handleNoteCreate}
-          onNoteClick={handleNoteClick}
+          artifacts={artifacts}
+          onArtifactCreate={handleArtifactCreate}
+          onArtifactClick={handleArtifactClick}
           onProjectUpdate={handleProjectUpdate}
           previewProject={previewProject}
           onPreviewProjectChange={(project) => {
             if (project) {
               closeAllDrawers()
               setPreviewProject(project)
+              setDrawerDirection(1)
+              setDrawerStack([{ type: 'project', projectId: project.id }])
             } else {
-              setPreviewProject(null)
+              closeAllDrawers()
             }
           }}
+          onDrawerTaskClick={pushDrawerTask}
+          onDrawerArtifactClick={pushDrawerArtifact}
         />
       )
     }
@@ -691,7 +746,7 @@ export default function App() {
           onStatusesChange={setStatuses}
           onNewTask={() => handleOpenNewTask()}
           onStartFocus={(task: Task) => { setFocusTask(task); setActiveView('focus'); }}
-          onCreateNote={(task: Task) => handleNoteCreate(task.project || '')}
+          onCreateNote={(task: Task) => handleArtifactCreate(task.project || '')}
           focusTaskId={focusTask?.id}
           projectFilter={undefined}
         />
@@ -699,12 +754,11 @@ export default function App() {
     }
 
     if (activeView.startsWith('project:')) {
-      const projectName = activeView.replace('project:', '')
-      const project = projects.find(p => p.name === projectName)
+      const projectRef = activeView.replace('project:', '')
+      const project = projects.find(p => p.id === projectRef || p.name === projectRef)
       if (!project) return <div className="p-8 text-muted-foreground">Project not found</div>
 
       const projectTasks = tasks.filter(t => t.project === project.id || t.project === project.name)
-      const projectResources = resources.filter(r => r.projectId === project.id || r.projectId === project.name)
 
       return (
         <ProjectDetails
@@ -712,7 +766,6 @@ export default function App() {
           tasks={projectTasks}
           projects={projects}
           statuses={statuses}
-          resources={projectResources}
           onProjectUpdate={handleProjectUpdate}
           onTaskCreate={(t) => handleTaskCreate({ ...t, project: project.id })}
           onNewTask={() => handleOpenNewTask(project.id)}
@@ -720,23 +773,19 @@ export default function App() {
           onTaskDelete={handleTaskDelete}
           onTaskClick={handleTaskClick}
           onStatusesChange={setStatuses}
-          onResourceCreate={(r) => handleResourceCreate({ ...r, projectId: project.id })}
-          onResourceUpdate={handleResourceUpdate}
-          onResourceDelete={handleResourceDelete}
-          onCreateNote={(task: Task) => handleNoteCreate(task.project || '')}
+          onCreateNote={(task: Task) => handleArtifactCreate(task.project || '')}
         />
       )
     }
 
-    if (activeView === 'attachments') {
-      const globalResources = resources.filter(r => !r.projectId)
+    if (activeView === 'artifacts') {
       return (
-        <AttachmentsView
-          resources={globalResources}
+        <ArtifactsView
+          artifacts={artifacts}
           projects={projects}
-          onResourceCreate={handleResourceCreate}
-          onResourceUpdate={handleResourceUpdate}
-          onResourceDelete={handleResourceDelete}
+          onArtifactCreate={handleArtifactCreate}
+          onArtifactClick={handleArtifactClick}
+          onArtifactDelete={handleArtifactDelete}
         />
       )
     }
@@ -771,22 +820,9 @@ export default function App() {
       )
     }
 
-    if (activeView === 'projects') {
-      return (
-        <ProjectsPage
-          projects={projects}
-          tasks={tasks}
-          onViewChange={handleViewChange}
-          onProjectCreate={handleProjectCreate}
-          onProjectUpdate={handleProjectUpdate}
-          onProjectDelete={handleProjectDelete}
-          onPinnedChange={() => setPinnedVersion(v => v + 1)}
-        />
-      )
-    }
-
     if (activeView === 'figma') return <FigmaView />
     if (activeView === 'apps') return <AppsDashboard />
+    if (activeView === 'integrations') return <IntegrationsPage onViewChange={setActiveView} />
     if (activeView === 'linear') return <LinearView />
 
     if (activeView === 'account') {
@@ -814,14 +850,18 @@ export default function App() {
   const getViewTitle = () => {
     if (activeView === 'today') return 'Overview'
     if (activeView === 'tasks') return 'All Tasks'
-    if (activeView.startsWith('project:')) return activeView.replace('project:', '')
-    if (activeView === 'attachments') return 'Notes'
-    if (activeView === 'projects') return 'Projects'
+    if (activeView.startsWith('project:')) {
+      const ref = activeView.replace('project:', '')
+      const proj = projects.find(p => p.id === ref || p.name === ref)
+      return proj?.name || ref
+    }
+    if (activeView === 'artifacts') return 'Artifacts'
     if (activeView === 'capacity') return 'Capacity'
     if (activeView === 'focus') return 'Focus Timer'
     if (activeView === 'time-tracking') return 'Time Tracking'
     if (activeView === 'figma') return 'Figma'
     if (activeView === 'apps') return 'Apps'
+    if (activeView === 'integrations') return 'Integrations'
     if (activeView === 'linear') return 'Linear'
     if (activeView === 'account') return 'Account'
     if (activeView === 'settings') return 'Settings'
@@ -874,11 +914,13 @@ export default function App() {
               onViewChange={handleViewChange}
               todayCount={todayCount}
               allTasksCount={allTasksCount}
-              pinnedVersion={pinnedVersion}
               user={user}
               onLogout={handleLogout}
               onShowOnboarding={() => setShowOnboarding(true)}
               onNewTask={() => handleOpenNewTask()}
+              onProjectCreate={handleProjectCreate}
+              onProjectUpdate={handleProjectUpdate}
+              onProjectDelete={handleProjectDelete}
             />
           )}
 
@@ -890,11 +932,13 @@ export default function App() {
               onViewChange={handleViewChange}
               todayCount={todayCount}
               allTasksCount={allTasksCount}
-              pinnedVersion={pinnedVersion}
               user={user}
               onLogout={handleLogout}
               onShowOnboarding={() => setShowOnboarding(true)}
               onNewTask={() => handleOpenNewTask()}
+              onProjectCreate={handleProjectCreate}
+              onProjectUpdate={handleProjectUpdate}
+              onProjectDelete={handleProjectDelete}
               isMobile
               onClose={() => setSidebarOpen(false)}
             />
@@ -955,35 +999,57 @@ export default function App() {
             onSave={handleTaskCreate}
           />
 
-          {/* Task details drawer */}
-          <TaskDetailsDrawer
-            task={selectedTask}
-            open={taskDrawerOpen}
-            onOpenChange={setTaskDrawerOpen}
+          {/* Unified drawer (desktop) */}
+          <UnifiedDrawer
+            stack={drawerStack}
+            direction={drawerDirection}
+            onClose={closeAllDrawers}
+            onBack={handleDrawerBack}
+            onPushTask={pushDrawerTask}
+            onPushArtifact={pushDrawerArtifact}
             projects={projects}
+            tasks={tasks}
             statuses={statuses}
-            resources={resources.filter(r => r.taskId === selectedTask?.id)}
-            onUpdate={handleTaskUpdate}
-            onDelete={handleTaskDelete}
-            onResourceCreate={handleResourceCreate}
+            artifacts={artifacts}
+            selectedTask={selectedTask}
+            selectedArtifact={selectedArtifact}
+            previewProject={previewProject}
+            onTaskUpdate={handleTaskUpdate}
+            onTaskDelete={handleTaskDelete}
+            onArtifactUpdate={handleArtifactUpdate}
+            onArtifactDelete={handleArtifactDelete}
+            onArtifactCreate={handleArtifactCreate}
+            onViewChange={handleViewChange}
           />
 
-          {/* Note drawer */}
-          <NoteDrawer
-            note={selectedNote}
-            open={noteDrawerOpen}
-            onOpenChange={setNoteDrawerOpen}
-            projects={projects}
-            onUpdate={handleNoteUpdate}
-            onDelete={handleNoteDelete}
-          />
+          {/* Mobile fallback drawers */}
+          {isMobile && selectedTask && drawerStack.length > 0 && drawerStack[drawerStack.length - 1].type === 'task' && (
+            <TaskDetailsDrawer
+              task={selectedTask}
+              open={true}
+              onOpenChange={(open) => { if (!open) closeAllDrawers(); }}
+              projects={projects}
+              statuses={statuses}
+              artifacts={artifacts}
+              onUpdate={handleTaskUpdate}
+              onDelete={(id) => { handleTaskDelete(id); closeAllDrawers(); }}
+              onArtifactClick={pushDrawerArtifact}
+            />
+          )}
+          {isMobile && selectedArtifact && drawerStack.length > 0 && drawerStack[drawerStack.length - 1].type === 'artifact' && (
+            <NoteDrawer
+              note={selectedArtifact}
+              open={true}
+              onOpenChange={(open) => { if (!open) closeAllDrawers(); }}
+              projects={projects}
+              tasks={tasks}
+              onUpdate={handleArtifactUpdate}
+              onDelete={(id) => { handleArtifactDelete(id); closeAllDrawers(); }}
+            />
+          )}
         </div>
 
-        <FeedbackPrompt
-          open={feedbackPrompt !== null}
-          onConfirm={handleFeedbackConfirm}
-          onSkip={handleFeedbackSkip}
-        />
+
 
         <UpdateNotification />
       </TooltipProvider>

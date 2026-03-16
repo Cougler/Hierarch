@@ -857,7 +857,12 @@ export function LinearView() {
     toast.success('Disconnected from Linear')
   }
 
-  if (!token) return <LinearSetup onConnect={handleConnect} />
+  if (!token) return (
+    <div className="flex flex-col items-center justify-center h-full min-h-[400px] gap-4 text-center px-4">
+      <img src="/linear.svg" alt="Linear" className="h-8 w-8 opacity-40" />
+      <p className="text-sm text-muted-foreground">Linear is not connected. Connect it from the Integrations page.</p>
+    </div>
+  )
 
   if (loadingTeams) {
     return (

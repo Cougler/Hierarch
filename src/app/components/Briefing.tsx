@@ -5,9 +5,9 @@ import { cn } from '@/app/lib/utils'
 import { Button } from '@/app/components/ui/button'
 import {
   MessageSquarePlus,
+  MessageSquare,
   ChevronRight,
   Plus,
-  Search,
   X,
   Folder,
   FileText,
@@ -17,7 +17,7 @@ import {
   ArrowRight,
 } from 'lucide-react'
 import type { Task, Project, StatusConfig, PhaseTransition } from '@/app/types'
-import type { DesignNote } from '@/app/components/NoteDrawer'
+import type { Artifact } from '@/app/components/NoteDrawer'
 import { getIconComponent } from '@/app/components/IconPicker'
 
 const BG_TO_HEX: Record<string, string> = {
@@ -50,12 +50,14 @@ interface BriefingProps {
   onTaskCreate: (task: Partial<Task>) => void
   onViewChange: (view: string) => void
   onNewTask?: () => void
-  designNotes: DesignNote[]
-  onNoteCreate: (projectId: string) => void
-  onNoteClick: (note: DesignNote) => void
+  artifacts: Artifact[]
+  onArtifactCreate: (projectId: string) => void
+  onArtifactClick: (note: Artifact) => void
   onProjectUpdate?: (id: string, updates: Partial<Project>) => void
   previewProject: Project | null
   onPreviewProjectChange: (project: Project | null) => void
+  onDrawerTaskClick?: (task: Task) => void
+  onDrawerArtifactClick?: (artifact: Artifact) => void
 }
 
 function getTimeOfDay(): string {
@@ -84,12 +86,14 @@ export function Briefing({
   onTaskCreate,
   onViewChange,
   onNewTask,
-  designNotes,
-  onNoteCreate,
-  onNoteClick,
+  artifacts,
+  onArtifactCreate,
+  onArtifactClick,
   previewProject,
   onPreviewProjectChange,
   onProjectUpdate,
+  onDrawerTaskClick,
+  onDrawerArtifactClick,
 }: BriefingProps) {
   const firstName = userName.split(' ')[0]
   const setPreviewProject = onPreviewProjectChange
@@ -101,21 +105,21 @@ export function Briefing({
 
   // ─── Notes grouped by project ───
   const notesByProject = useMemo(() => {
-    const map = new Map<string, DesignNote[]>()
-    for (const note of designNotes) {
+    const map = new Map<string, Artifact[]>()
+    for (const note of artifacts) {
       const key = note.projectId || ''
       const arr = map.get(key) || []
       arr.push(note)
       map.set(key, arr)
     }
     return map
-  }, [designNotes])
+  }, [artifacts])
 
   // ─── Recent Activity (unified feed from last 48h) ───
   type ActivityItem =
     | { type: 'phase'; timestamp: string; task: Task; transition: PhaseTransition; projectName?: string }
-    | { type: 'note-created'; timestamp: string; note: DesignNote; projectName?: string }
-    | { type: 'note-edited'; timestamp: string; note: DesignNote; projectName?: string }
+    | { type: 'note-created'; timestamp: string; note: Artifact; projectName?: string }
+    | { type: 'note-edited'; timestamp: string; note: Artifact; projectName?: string }
     | { type: 'project-created'; timestamp: string; project: Project }
     | { type: 'task-created'; timestamp: string; task: Task; projectName?: string }
 
@@ -144,7 +148,7 @@ export function Briefing({
     }
 
     // Note creation & editing
-    for (const note of designNotes) {
+    for (const note of artifacts) {
       const project = note.projectId ? projects.find(p => p.id === note.projectId) : undefined
       if (new Date(note.timestamp) >= cutoff) {
         items.push({ type: 'note-created', timestamp: note.timestamp, note, projectName: project?.name })
@@ -162,7 +166,7 @@ export function Briefing({
     }
 
     return items.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
-  }, [tasks, projects, designNotes])
+  }, [tasks, projects, artifacts])
 
   // ─── Active Projects (projects with non-done tasks, sorted by most recent activity) ───
   const activeProjects = useMemo(() => {
@@ -271,20 +275,9 @@ export function Briefing({
               </h1>
               <p className="text-sm text-muted-foreground mt-1">
                 {format(new Date(), 'EEEE, MMMM d')}
-                <span className="mx-2 text-border">·</span>
-                {activeTasks.length} active task{activeTasks.length !== 1 ? 's' : ''}
               </p>
             </div>
             <div className="flex items-center gap-2.5 shrink-0">
-              <Button
-                variant="outline"
-                size="sm"
-                className="h-9 gap-2 text-xs border-border/50 text-muted-foreground hover:text-foreground"
-                onClick={() => onViewChange('tasks')}
-              >
-                <Search className="h-3.5 w-3.5" />
-                Search
-              </Button>
               {onNewTask && (
                 <Button
                   size="sm"
@@ -299,22 +292,22 @@ export function Briefing({
           </div>
 
           {/* ─── Stat Cards ─── */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-12">
-            <div className="rounded-xl border border-white/[0.08] bg-white/[0.04] backdrop-blur-xl px-5 py-5">
-              <p className="text-3xl font-semibold tracking-tight">{activeTasks.length}</p>
-              <p className="text-xs text-muted-foreground mt-1.5">Active Tasks</p>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-10">
+            <div className="border-t border-b border-white/[0.06] px-4 py-3">
+              <p className="text-xl font-medium tracking-tight text-foreground/80">{projectCount}</p>
+              <p className="text-[10px] text-muted-foreground/60 mt-1">Projects</p>
             </div>
-            <div className="rounded-xl border border-white/[0.08] bg-white/[0.04] backdrop-blur-xl px-5 py-5">
-              <p className="text-3xl font-semibold tracking-tight">{projectCount}</p>
-              <p className="text-xs text-muted-foreground mt-1.5">Projects</p>
+            <div className="border-t border-b border-white/[0.06] px-4 py-3">
+              <p className="text-xl font-medium tracking-tight text-foreground/80">{activeTasks.length}</p>
+              <p className="text-[10px] text-muted-foreground/60 mt-1">Active Tasks</p>
             </div>
-            <div className="rounded-xl border border-white/[0.08] bg-white/[0.04] backdrop-blur-xl px-5 py-5">
-              <p className="text-3xl font-semibold tracking-tight text-orange-400">{needsAttention.length}</p>
-              <p className="text-xs text-muted-foreground mt-1.5">Needs Attention</p>
+            <div className="border-t border-b border-white/[0.06] px-4 py-3">
+              <p className="text-xl font-medium tracking-tight text-orange-400/80">{needsAttention.length}</p>
+              <p className="text-[10px] text-muted-foreground/60 mt-1">Needs Attention</p>
             </div>
-            <div className="rounded-xl border border-white/[0.08] bg-white/[0.04] backdrop-blur-xl px-5 py-5">
-              <p className="text-3xl font-semibold tracking-tight text-emerald-400">{completedTasks.length}</p>
-              <p className="text-xs text-muted-foreground mt-1.5">Completed</p>
+            <div className="border-t border-b border-white/[0.06] px-4 py-3">
+              <p className="text-xl font-medium tracking-tight text-emerald-400/80">{completedTasks.length}</p>
+              <p className="text-[10px] text-muted-foreground/60 mt-1">Completed</p>
             </div>
           </div>
 
@@ -340,19 +333,25 @@ export function Briefing({
                     <p className="text-sm text-muted-foreground">No active projects yet.</p>
                   </div>
                 ) : (
-                  <div>
-                    {activeProjects.map(({ project, taskCount, lastActivity }, i) => {
+                  <div className="space-y-2">
+                    {activeProjects.map(({ project, taskCount, lastActivity }) => {
                       const projectAttention = attentionByProject.get(project.id) || []
                       const projectNotes = notesByProject.get(project.id) || []
+                      const ProjectIcon = getIconComponent(project.metadata?.icon)
+                      const iconColor = project.metadata?.color
                       return (
-                        <div key={project.id} className={i > 0 ? 'border-t border-border/50' : ''}>
+                        <div
+                          key={project.id}
+                          className="rounded-xl border border-white/[0.08] bg-white/[0.03] overflow-hidden"
+                        >
                           {/* Project row */}
                           <div
                             onClick={() => setPreviewProject(project)}
-                            className="group flex items-center gap-3 py-2 -mx-2 px-2 rounded-md cursor-pointer transition-colors hover:bg-accent/20"
+                            className="group flex items-center gap-3 py-2.5 px-3 cursor-pointer transition-colors hover:bg-accent/20"
                           >
                             <div className="flex-1 min-w-0 flex items-center gap-2">
-                              <span className="text-xs font-medium text-foreground truncate">{project.name}</span>
+                              <ProjectIcon className="h-3.5 w-3.5 shrink-0 text-foreground/50" />
+                              <span className="text-sm font-medium text-foreground truncate">{project.name}</span>
                               <span className="text-[10px] text-muted-foreground/60 shrink-0">
                                 {taskCount}
                                 {lastActivity.getTime() > 0 && (
@@ -361,50 +360,14 @@ export function Briefing({
                               </span>
                             </div>
                             <div className="flex items-center gap-1.5 shrink-0">
-                              {projectNotes.length > 0 && (
-                                <span className="text-[10px] text-muted-foreground/50 tabular-nums">
-                                  {projectNotes.length}
+                              {projectAttention.length > 0 ? (
+                                <span className="text-[10px] text-amber-500/70">
+                                  {projectAttention.length} needs attention
                                 </span>
-                              )}
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation()
-                                  onNoteCreate(project.id)
-                                }}
-                                className="p-1 rounded text-muted-foreground/30 hover:text-foreground hover:bg-accent/30 transition-colors"
-                                title="Add design note"
-                              >
-                                <MessageSquarePlus className="h-3 w-3" />
-                              </button>
+                              ) : null}
                               <ChevronRight className="h-3.5 w-3.5 text-muted-foreground/30" />
                             </div>
                           </div>
-
-                          {/* Needs attention tasks for this project */}
-                          {projectAttention.length > 0 && (
-                            <div className="ml-3 mb-1.5 space-y-0">
-                              {projectAttention.map(item => (
-                                <button
-                                  key={item.task.id}
-                                  onClick={() => { setPreviewProject(null); onTaskClick(item.task) }}
-                                  className="w-full flex items-center gap-1.5 px-2 py-1 rounded text-left transition-colors hover:bg-accent/20"
-                                >
-                                  <div
-                                    className="w-1 h-1 rounded-full shrink-0"
-                                    style={{
-                                      backgroundColor: item.urgency === 'overdue'
-                                        ? '#f87171'
-                                        : item.urgency === 'feedback'
-                                          ? '#fb923c'
-                                          : '#64748b',
-                                    }}
-                                  />
-                                  <span className="text-[11px] text-foreground/60 truncate">{item.task.title}</span>
-                                  <span className="text-[10px] text-muted-foreground/40 shrink-0 ml-auto">{item.reason}</span>
-                                </button>
-                              ))}
-                            </div>
-                          )}
                         </div>
                       )
                     })}
@@ -419,7 +382,7 @@ export function Briefing({
                       {unassignedAttention.map(item => (
                         <button
                           key={item.task.id}
-                          onClick={() => { setPreviewProject(null); onTaskClick(item.task) }}
+                          onClick={() => onDrawerTaskClick ? onDrawerTaskClick(item.task) : (setPreviewProject(null), onTaskClick(item.task))}
                           className="w-full flex items-center gap-2 px-3 py-1.5 rounded-md text-left transition-colors hover:bg-accent/20"
                         >
                           <div
@@ -452,10 +415,14 @@ export function Briefing({
                   <p className="text-sm text-muted-foreground">No recent activity.</p>
                 </div>
               ) : (
-                <div className="flex-1 min-h-0 rounded-xl border border-white/[0.08] bg-white/[0.07] backdrop-blur-xl overflow-hidden">
+                <div className="flex-1 min-h-0 rounded-xl border border-border/30 bg-card/20 backdrop-blur-xl overflow-hidden">
                   <div className="h-full overflow-y-auto p-2 scrollbar-auto-hide">
                     {recentActivity.map((item, idx) => {
                       if (item.type === 'phase') {
+                        const isFeedbackTransition = statuses.find(s => s.id === item.transition.toPhase)?.isFeedback
+                        const linkedNote = isFeedbackTransition
+                          ? artifacts.find(n => n.taskId === item.task.id && n.type === 'feedback')
+                          : undefined
                         return (
                           <button
                             key={`phase-${item.transition.id}`}
@@ -467,9 +434,22 @@ export function Briefing({
                               style={{ backgroundColor: getPhaseColor(item.transition.toPhase, statuses) }}
                             />
                             <div className="flex-1 min-w-0">
-                              <p className="text-sm text-foreground truncate">{item.task.title}</p>
-                              <p className="text-xs text-muted-foreground mt-0.5">
-                                {getPhaseTitle(item.transition.fromPhase, statuses)} <ArrowRight className="inline h-2.5 w-2.5" /> {getPhaseTitle(item.transition.toPhase, statuses)}
+                              <p className="text-xs text-foreground truncate">{item.task.title}</p>
+                              <p className="text-[10px] text-muted-foreground mt-0.5">
+                                {isFeedbackTransition ? (
+                                  <>
+                                    Moved to feedback
+                                    {linkedNote && (
+                                      <> with <span
+                                        role="link"
+                                        onClick={(e) => { e.stopPropagation(); onArtifactClick(linkedNote) }}
+                                        className="text-primary hover:underline cursor-pointer"
+                                      >note</span></>
+                                    )}
+                                  </>
+                                ) : (
+                                  <>{getPhaseTitle(item.transition.fromPhase, statuses)} <ArrowRight className="inline h-2.5 w-2.5" /> {getPhaseTitle(item.transition.toPhase, statuses)}</>
+                                )}
                                 {item.projectName && <span className="ml-1.5 text-muted-foreground/60">· {item.projectName}</span>}
                               </p>
                             </div>
@@ -489,8 +469,8 @@ export function Briefing({
                           >
                             <ListPlus className="h-3.5 w-3.5 text-blue-400 shrink-0" />
                             <div className="flex-1 min-w-0">
-                              <p className="text-sm text-foreground truncate">{item.task.title}</p>
-                              <p className="text-xs text-muted-foreground mt-0.5">
+                              <p className="text-xs text-foreground truncate">{item.task.title}</p>
+                              <p className="text-[10px] text-muted-foreground mt-0.5">
                                 Task created
                                 {item.projectName && <span className="ml-1.5 text-muted-foreground/60">· {item.projectName}</span>}
                               </p>
@@ -506,13 +486,13 @@ export function Briefing({
                         return (
                           <button
                             key={`note-new-${item.note.id}`}
-                            onClick={() => onNoteClick(item.note)}
+                            onClick={() => onArtifactClick(item.note)}
                             className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-left transition-colors hover:bg-white/[0.04]"
                           >
                             <FileText className="h-3.5 w-3.5 text-violet-400 shrink-0" />
                             <div className="flex-1 min-w-0">
-                              <p className="text-sm text-foreground truncate">{item.note.title || 'Untitled note'}</p>
-                              <p className="text-xs text-muted-foreground mt-0.5">
+                              <p className="text-xs text-foreground truncate">{item.note.title || 'Untitled note'}</p>
+                              <p className="text-[10px] text-muted-foreground mt-0.5">
                                 Note created
                                 {item.projectName && <span className="ml-1.5 text-muted-foreground/60">· {item.projectName}</span>}
                               </p>
@@ -528,13 +508,13 @@ export function Briefing({
                         return (
                           <button
                             key={`note-edit-${item.note.id}-${item.timestamp}`}
-                            onClick={() => onNoteClick(item.note)}
+                            onClick={() => onArtifactClick(item.note)}
                             className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-left transition-colors hover:bg-white/[0.04]"
                           >
                             <PenLine className="h-3.5 w-3.5 text-amber-400 shrink-0" />
                             <div className="flex-1 min-w-0">
-                              <p className="text-sm text-foreground truncate">{item.note.title || 'Untitled note'}</p>
-                              <p className="text-xs text-muted-foreground mt-0.5">
+                              <p className="text-xs text-foreground truncate">{item.note.title || 'Untitled note'}</p>
+                              <p className="text-[10px] text-muted-foreground mt-0.5">
                                 Note edited
                                 {item.projectName && <span className="ml-1.5 text-muted-foreground/60">· {item.projectName}</span>}
                               </p>
@@ -550,7 +530,7 @@ export function Briefing({
                         return (
                           <button
                             key={`proj-${item.project.id}`}
-                            onClick={() => onViewChange(`project:${item.project.name}`)}
+                            onClick={() => onViewChange(`project:${item.project.id}`)}
                             className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-left transition-colors hover:bg-white/[0.04]"
                           >
                             <FolderPlus className="h-3.5 w-3.5 text-emerald-400 shrink-0" />
@@ -572,182 +552,6 @@ export function Briefing({
               )}
             </div>
           </div>
-
-      {/* ─── Project Preview Drawer ─── */}
-      <AnimatePresence>
-        {previewProject && (() => {
-          const proj = previewProject
-          const projTasks = tasks.filter(t => t.project === proj.id || t.project === proj.name)
-          const projActiveTasks = projTasks.filter(t => !doneStatuses.has(t.status))
-          const projDoneTasks = projTasks.filter(t => doneStatuses.has(t.status))
-          const projNotes = notesByProject.get(proj.id) || []
-          const projAttention = attentionByProject.get(proj.id) || []
-
-          return (
-            <>
-              {/* Close button */}
-              <motion.button
-                key="project-drawer-close"
-                initial={{ opacity: 0, x: 40 }}
-                animate={{ opacity: 0.85, x: 0 }}
-                exit={{ opacity: 0, x: 40, transition: { type: 'spring', stiffness: 420, damping: 32, mass: 0.7 } }}
-                whileHover={{ opacity: 1 }}
-                transition={{ delay: 0.25, type: 'spring', stiffness: 320, damping: 28 }}
-                onClick={() => setPreviewProject(null)}
-                style={{ backgroundColor: '#1c1c1a' }}
-                className="fixed top-8 right-[460px] z-50 flex h-[60px] w-8 items-center justify-center rounded-full text-muted-foreground shadow-lg border border-white/[0.08] hover:text-foreground transition-colors"
-              >
-                <X className="h-3.5 w-3.5" />
-              </motion.button>
-
-              {/* Drawer panel */}
-              <motion.div
-                key="project-drawer"
-                initial={{ opacity: 0, scale: 0.88 }}
-                animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0, scale: 0.88 }}
-                transition={{ type: 'spring', stiffness: 420, damping: 32, mass: 0.7 }}
-                style={{ backgroundColor: '#1c1c1a', transformOrigin: 'top right' }}
-                className="fixed top-8 right-8 bottom-8 z-50 w-[420px] rounded-2xl shadow-2xl border border-white/[0.08] overflow-hidden flex flex-col"
-              >
-                <div className="flex-1 min-h-0 overflow-y-auto">
-                  <div className="p-5 space-y-6">
-                    {/* Header */}
-                    <div>
-                      <div className="flex items-center gap-3 mb-1">
-                        {(() => {
-                          const IconComp = proj.metadata?.icon ? getIconComponent(proj.metadata.icon) : Folder
-                          return <IconComp className="h-4 w-4 text-muted-foreground/50 shrink-0" />
-                        })()}
-                        <h2 className="text-lg font-semibold text-foreground truncate">{proj.name}</h2>
-                      </div>
-                      {proj.description && (
-                        <p className="text-xs text-muted-foreground leading-relaxed mt-2">{proj.description}</p>
-                      )}
-                    </div>
-
-                    {/* Stats row */}
-                    <div className="grid grid-cols-3 gap-3">
-                      <div className="rounded-lg border border-white/[0.08] bg-white/[0.04] px-3 py-2.5">
-                        <p className="text-lg font-semibold">{projActiveTasks.length}</p>
-                        <p className="text-[10px] text-muted-foreground">Active</p>
-                      </div>
-                      <div className="rounded-lg border border-white/[0.08] bg-white/[0.04] px-3 py-2.5">
-                        <p className="text-lg font-semibold text-emerald-400">{projDoneTasks.length}</p>
-                        <p className="text-[10px] text-muted-foreground">Done</p>
-                      </div>
-                      <div className="rounded-lg border border-white/[0.08] bg-white/[0.04] px-3 py-2.5">
-                        <p className="text-lg font-semibold">{projNotes.length}</p>
-                        <p className="text-[10px] text-muted-foreground">Notes</p>
-                      </div>
-                    </div>
-
-                    {/* Needs attention */}
-                    {projAttention.length > 0 && (
-                      <div>
-                        <h3 className="text-xs font-medium text-muted-foreground mb-2">Needs Attention</h3>
-                        <div className="space-y-1">
-                          {projAttention.map(item => (
-                            <button
-                              key={item.task.id}
-                              onClick={() => { setPreviewProject(null); onTaskClick(item.task) }}
-                              className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-left transition-colors hover:bg-white/[0.04]"
-                            >
-                              <div
-                                className="w-1.5 h-1.5 rounded-full shrink-0"
-                                style={{
-                                  backgroundColor: item.urgency === 'overdue'
-                                    ? '#f87171'
-                                    : item.urgency === 'feedback'
-                                      ? '#fb923c'
-                                      : '#64748b',
-                                }}
-                              />
-                              <span className="text-xs text-foreground/80 truncate">{item.task.title}</span>
-                              <span className="text-[10px] text-muted-foreground/50 shrink-0 ml-auto">{item.reason}</span>
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Active tasks */}
-                    {projActiveTasks.length > 0 && (
-                      <div>
-                        <h3 className="text-xs font-medium text-muted-foreground mb-2">
-                          Active Tasks
-                          <span className="ml-1.5 text-muted-foreground/50 tabular-nums">{projActiveTasks.length}</span>
-                        </h3>
-                        <div className="space-y-0.5">
-                          {projActiveTasks.map(task => {
-                            const sc = statuses.find(s => s.id === task.status)
-                            return (
-                              <button
-                                key={task.id}
-                                onClick={() => { setPreviewProject(null); onTaskClick(task) }}
-                                className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-left transition-colors hover:bg-white/[0.04]"
-                              >
-                                <span className={cn('h-2 w-2 rounded-full shrink-0', sc?.color ?? 'bg-slate-500')} />
-                                <span className="text-xs text-foreground truncate">{task.title}</span>
-                                {task.dueDate && (
-                                  <span className="text-[10px] text-muted-foreground/50 shrink-0 ml-auto">
-                                    {format(new Date(task.dueDate), 'MMM d')}
-                                  </span>
-                                )}
-                              </button>
-                            )
-                          })}
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Design notes */}
-                    {projNotes.length > 0 && (
-                      <div>
-                        <div className="flex items-center justify-between mb-2">
-                          <h3 className="text-xs font-medium text-muted-foreground">Design Notes</h3>
-                          <button
-                            onClick={() => { setPreviewProject(null); onNoteCreate(proj.id) }}
-                            className="text-[10px] text-primary hover:text-primary/80 transition-colors"
-                          >
-                            + Add
-                          </button>
-                        </div>
-                        <div className="space-y-1">
-                          {projNotes.slice(0, 5).map(note => (
-                            <button
-                              key={note.id}
-                              onClick={() => { setPreviewProject(null); onNoteClick(note) }}
-                              className="w-full px-3 py-2 rounded-lg text-left transition-colors hover:bg-white/[0.04]"
-                            >
-                              <p className="text-xs text-foreground/80 truncate">
-                                {note.title || note.text || 'Untitled note'}
-                              </p>
-                              <p className="text-[10px] text-muted-foreground/50 mt-0.5">
-                                {isToday(new Date(note.updatedAt || note.timestamp))
-                                  ? format(new Date(note.updatedAt || note.timestamp), 'h:mm a')
-                                  : format(new Date(note.updatedAt || note.timestamp), 'MMM d')}
-                              </p>
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Footer: open full view */}
-                    <button
-                      onClick={() => { setPreviewProject(null); onViewChange(`project:${proj.name}`) }}
-                      className="w-full text-center py-2.5 text-xs text-primary hover:text-primary/80 transition-colors"
-                    >
-                      Open full project view →
-                    </button>
-                  </div>
-                </div>
-              </motion.div>
-            </>
-          )
-        })()}
-      </AnimatePresence>
 
     </div>
   )

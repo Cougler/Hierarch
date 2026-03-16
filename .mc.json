@@ -3,5 +3,5 @@
   "status": "active",
   "stack": ["React", "TypeScript", "Tailwind CSS", "shadcn/ui", "Supabase"],
   "url": "https://hierarch.vercel.app",
-  "notes": "Overview page is polished and live — responsive two-column layout, unified activity feed (phase changes, notes, tasks, projects), project preview drawer, and all drawers close each other via centralized closeAllDrawers(). Linear issues now display as a table instead of kanban. Demo data and onboarding are rewritten with realistic projects and design-phase-focused content. Deployed to hierarchical.app. Next: build Insights view, continue design cockpit vision."
+  "notes": "The Integrations page is live with Linear, Jira, Slack, and Figma cards. Linear connect flow uses a custom drawer matching the app's design system. The sidebar conditionally shows integrations as a section (when connected) or a single nav item (when not). Linear OAuth migration is planned and scoped — replacing localStorage token storage with Supabase-backed OAuth for proper user isolation and security. A new data-flow audit agent joins the review team. Next: create Linear OAuth app, build the OAuth flow (edge function + callback + integrations table), then wire up demo mode with fake Linear data."
 }

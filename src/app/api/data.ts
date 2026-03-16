@@ -79,7 +79,8 @@ export async function createProject(
   name: string,
   metadata?: ProjectMetadata,
   startDate?: string,
-  endDate?: string
+  endDate?: string,
+  description?: string
 ): Promise<Project | null> {
   try {
     const ownerId = await getOwnerId();
@@ -87,6 +88,7 @@ export async function createProject(
       .from('projects')
       .insert({
         name,
+        description: description ?? null,
         metadata: metadata ?? {},
         start_date: startDate ?? null,
         end_date: endDate ?? null,
