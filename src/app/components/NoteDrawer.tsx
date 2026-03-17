@@ -134,7 +134,7 @@ function getLinkLabel(url: string): string {
     }
     // Capitalize the domain name as fallback
     const parts = hostname.split('.');
-    const name = parts.length > 1 ? parts[parts.length - 2] : parts[0];
+    const name = parts.length > 1 ? parts[parts.length - 2]! : parts[0]!;
     return name.charAt(0).toUpperCase() + name.slice(1);
   } catch {
     return url;
@@ -468,7 +468,7 @@ export function NoteDrawer({
     range.insertNode(wrapper);
     // Move cursor after the badge
     const after = document.createRange();
-    after.setStartAfter(badge);
+    after.setStartAfter(wrapper);
     after.collapse(true);
     const sel = window.getSelection();
     sel?.removeAllRanges();
