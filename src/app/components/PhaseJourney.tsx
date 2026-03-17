@@ -66,7 +66,7 @@ export function PhaseJourney({ phaseHistory, statuses, currentPhase, maxItems = 
         if (isDone) {
           label = `Handed off`
         } else if (isFeedback) {
-          label = `Moved to review`
+          label = `Moved to feedback`
         } else {
           label = `Moved to ${toPhase?.title ?? transition.toPhase}`
         }
@@ -101,7 +101,7 @@ export function PhaseJourney({ phaseHistory, statuses, currentPhase, maxItems = 
                     role="link"
                     onClick={(e) => { e.stopPropagation(); onArtifactClick(linkedNote) }}
                     className="text-primary hover:underline cursor-pointer"
-                  >note</span></>
+                  >feedback</span></>
                 )}
               </p>
               <span className="text-[10px] text-muted-foreground/40">

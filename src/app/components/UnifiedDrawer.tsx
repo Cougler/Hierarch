@@ -40,6 +40,7 @@ interface UnifiedDrawerProps {
   onArtifactUpdate: (id: string, updates: Partial<Artifact>) => void;
   onArtifactDelete: (id: string) => void;
   onArtifactCreate: (projectId: string) => void;
+  onProjectUpdate?: (id: string, updates: Partial<Project>) => void;
   onViewChange: (view: string) => void;
   onCreateBlocker?: (taskId: string, blocker: { type: BlockerType; title: string; owner?: string }) => void;
   onResolveBlocker?: (taskId: string, blockerId: string, unresolve?: boolean) => void;
@@ -102,6 +103,7 @@ export function UnifiedDrawer({
   onArtifactUpdate,
   onArtifactDelete,
   onArtifactCreate,
+  onProjectUpdate,
   onViewChange,
   onCreateBlocker,
   onResolveBlocker,
@@ -138,6 +140,7 @@ export function UnifiedDrawer({
           onTaskClick={onPushTask}
           onArtifactClick={onPushArtifact}
           onArtifactCreate={onArtifactCreate}
+          onProjectUpdate={onProjectUpdate}
           onViewChange={onViewChange}
           onClose={onClose}
         />

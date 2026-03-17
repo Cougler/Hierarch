@@ -152,7 +152,7 @@ function mapDbTaskToTask(row: Record<string, unknown>): Task {
     id: row.id as string,
     title: (row.title as string) ?? '',
     description: content,
-    status: LEGACY_STATUS_MAP[((row.status as string) ?? 'explore').toLowerCase()] ?? ((row.status as string) ?? 'explore').toLowerCase(),
+    status: LEGACY_STATUS_MAP[((row.status as string) ?? 'todo').toLowerCase()] ?? ((row.status as string) ?? 'todo').toLowerCase(),
     tags: Array.isArray(row.tags) ? (row.tags as string[]) : [],
     dueDate: (row.due_at as string) ?? '',
     assignees: Array.isArray(row.assignees) ? (row.assignees as string[]) : [],
@@ -218,7 +218,7 @@ export async function createTask(
     const insert: Record<string, unknown> = {
       title: task.title,
       description: descriptionJson,
-      status: task.status ?? 'explore',
+      status: task.status ?? 'todo',
       tags: task.tags ?? [],
       due_at: task.dueDate || null,
       assignees: task.assignees ?? [],

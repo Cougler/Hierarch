@@ -221,10 +221,10 @@ export function Briefing({
         continue
       }
 
-      // In review phase
+      // Awaiting feedback
       const phase = statusMap.get(task.status)
       if (phase?.isFeedback) {
-        items.push({ task, reason: 'In review', urgency: 'feedback' })
+        items.push({ task, reason: 'Awaiting feedback', urgency: 'feedback' })
         continue
       }
 
@@ -288,6 +288,14 @@ export function Briefing({
               <p className="text-sm text-muted-foreground mt-1">
                 {format(new Date(), 'EEEE, MMMM d')}
               </p>
+              <div className="flex items-center gap-4 mt-2 text-xs text-muted-foreground">
+                <span><strong className="text-foreground font-medium">{projectCount}</strong> projects</span>
+                <span><strong className="text-foreground font-medium">{activeTasks.length}</strong> active</span>
+                {needsAttention.length > 0 && (
+                  <span><strong className="text-attention font-medium">{needsAttention.length}</strong> attention</span>
+                )}
+                <span><strong className="text-emerald-600 dark:text-emerald-400 font-medium">{completedTasks.length}</strong> done</span>
+              </div>
             </div>
             <div className="flex items-center gap-2.5 shrink-0">
               {onNewTask && (
@@ -303,26 +311,6 @@ export function Briefing({
             </div>
           </div>
 
-          {/* ─── Stat Cards ─── */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-10">
-            <div className="border-t border-b border-border px-4 py-3">
-              <p className="text-xl font-medium tracking-tight text-foreground/80">{projectCount}</p>
-              <p className="text-[10px] text-muted-foreground/60 mt-1">Projects</p>
-            </div>
-            <div className="border-t border-b border-border px-4 py-3">
-              <p className="text-xl font-medium tracking-tight text-foreground/80">{activeTasks.length}</p>
-              <p className="text-[10px] text-muted-foreground/60 mt-1">Active Tasks</p>
-            </div>
-            <div className="border-t border-b border-border px-4 py-3">
-              <p className="text-xl font-medium tracking-tight text-attention">{needsAttention.length}</p>
-              <p className="text-[10px] text-muted-foreground/60 mt-1">Needs Attention</p>
-            </div>
-            <div className="border-t border-b border-border px-4 py-3">
-              <p className="text-xl font-medium tracking-tight text-emerald-400/80">{completedTasks.length}</p>
-              <p className="text-[10px] text-muted-foreground/60 mt-1">Completed</p>
-            </div>
-          </div>
-
           {/* ─── Two-Column Layout ─── */}
           <div className="flex-1 min-h-0 grid grid-cols-1 md:grid-cols-[minmax(0,1fr)_360px] gap-10 items-stretch pb-[60px]">
 
@@ -330,7 +318,7 @@ export function Briefing({
             <div className="flex flex-col min-h-0 min-w-0 overflow-y-auto overflow-x-hidden">
               {/* ─── Active Projects ─── */}
               <section>
-                <div className="flex items-center justify-between mb-5">
+                <div className="flex items-center gap-3 mb-5">
                   <h2 className="text-sm font-semibold">Active Projects</h2>
                   <button
                     onClick={() => onViewChange('tasks')}
@@ -352,14 +340,11 @@ export function Briefing({
                       const ProjectIcon = getIconComponent(project.metadata?.icon)
                       const iconColor = project.metadata?.color
                       return (
-                        <div
-                          key={project.id}
-                          className="rounded-xl border border-border bg-card overflow-hidden"
-                        >
+                        <div key={project.id}>
                           {/* Project row */}
                           <div
                             onClick={() => setPreviewProject(project)}
-                            className="group flex items-center gap-3 py-2.5 px-3 cursor-pointer transition-colors hover:bg-accent/20"
+                            className="group flex items-center gap-3 py-2 cursor-pointer transition-colors hover:bg-accent/20 rounded-lg"
                           >
                             <div className="flex-1 min-w-0 flex items-center gap-2">
                               <ProjectIcon className="h-3.5 w-3.5 shrink-0 text-foreground/50" />
@@ -380,6 +365,22 @@ export function Briefing({
                               <ChevronRight className="h-3.5 w-3.5 text-muted-foreground/30" />
                             </div>
                           </div>
+                          {/* Nested attention tasks */}
+                          {projectAttention.length > 0 && (
+                            <div className="ml-2 mb-1">
+                              {projectAttention.map(item => (
+                                <button
+                                  key={item.task.id}
+                                  onClick={() => onDrawerTaskClick ? onDrawerTaskClick(item.task) : onTaskClick(item.task)}
+                                  className="w-full flex items-center gap-2 py-1.5 pl-2 rounded-md text-left transition-colors hover:bg-accent/20"
+                                >
+                                  <img src="/arrow-down-right.svg" alt="" className="h-3 w-3 shrink-0 opacity-40 invert-on-light" />
+                                  <span className="text-sm text-foreground/80 truncate">{item.task.title}</span>
+                                  <span className="text-xs text-muted-foreground/70 shrink-0 ml-auto">{item.reason}</span>
+                                </button>
+                              ))}
+                            </div>
+                          )}
                         </div>
                       )
                     })}
@@ -450,13 +451,13 @@ export function Briefing({
                               <p className="text-[10px] text-muted-foreground mt-0.5">
                                 {isFeedbackTransition ? (
                                   <>
-                                    Moved to review
+                                    Moved to feedback
                                     {linkedNote && (
                                       <> with <span
                                         role="link"
                                         onClick={(e) => { e.stopPropagation(); onArtifactClick(linkedNote) }}
                                         className="text-primary hover:underline cursor-pointer"
-                                      >note</span></>
+                                      >feedback</span></>
                                     )}
                                   </>
                                 ) : (

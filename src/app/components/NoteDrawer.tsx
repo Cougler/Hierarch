@@ -47,7 +47,7 @@ export type ArtifactType = 'freeform' | 'decision' | 'feedback' | 'research' | '
 // ─── Type metadata ──────────────────────────────────────────────────────────
 
 const TYPE_META: { id: ArtifactType; label: string; icon: React.ElementType; color: string; bg: string }[] = [
-  { id: 'freeform', label: 'Quick Note', icon: FileText, color: 'text-blue-700 dark:text-blue-400', bg: 'bg-blue-500/10' },
+  { id: 'freeform', label: 'Note', icon: FileText, color: 'text-blue-700 dark:text-blue-400', bg: 'bg-blue-500/10' },
   { id: 'decision', label: 'Decision', icon: PenLine, color: 'text-amber-700 dark:text-amber-400', bg: 'bg-amber-500/10' },
   { id: 'feedback', label: 'Feedback', icon: MessageSquare, color: 'text-emerald-700 dark:text-emerald-400', bg: 'bg-emerald-500/10' },
   { id: 'research', label: 'Research', icon: FlaskConical, color: 'text-violet-700 dark:text-violet-400', bg: 'bg-violet-500/10' },

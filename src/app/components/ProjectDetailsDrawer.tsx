@@ -8,6 +8,7 @@ import { Textarea } from '@/app/components/ui/textarea';
 import { Popover, PopoverContent, PopoverTrigger } from '@/app/components/ui/popover';
 import { ChecklistSection } from '@/app/components/ChecklistSection';
 import type { Project, BlockerItem } from '@/app/types';
+import { PROJECT_PHASES } from '@/app/types';
 
 interface ProjectDetailsDrawerProps {
   open: boolean;
@@ -29,9 +30,12 @@ export function ProjectDetailsDrawer({
   const [startOpen, setStartOpen] = useState(false);
   const [endOpen, setEndOpen] = useState(false);
 
+  const [phase, setPhase] = useState('');
+
   // Sync state from project when drawer opens
   useEffect(() => {
     if (open) {
+      setPhase(project.metadata?.phase ?? '');
       setDescription(project.description ?? '');
       setStartDate(project.metadata?.start_date ?? '');
       setEndDate(project.metadata?.end_date ?? '');
@@ -104,6 +108,33 @@ export function ProjectDetailsDrawer({
           >
             <div className="flex flex-col gap-5 p-5 overflow-auto flex-1">
               <h3 className="text-sm font-semibold text-foreground">Project details</h3>
+
+              {/* Phase */}
+              <div>
+                <label className="mb-2 block text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/60">
+                  Phase
+                </label>
+                <div className="flex flex-wrap gap-1.5">
+                  {PROJECT_PHASES.map(p => (
+                    <button
+                      key={p.id}
+                      onClick={() => {
+                        setPhase(p.id);
+                        save({ metadata: { ...project.metadata, phase: p.id } });
+                      }}
+                      className={cn(
+                        'flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium transition-colors border',
+                        phase === p.id
+                          ? 'border-primary/40 bg-primary/10 text-primary'
+                          : 'border-border text-muted-foreground/60 hover:text-foreground hover:border-border',
+                      )}
+                    >
+                      <span className={cn('h-1.5 w-1.5 rounded-full', p.color)} />
+                      {p.title}
+                    </button>
+                  ))}
+                </div>
+              </div>
 
               {/* Description */}
               <div>

@@ -444,7 +444,7 @@ export default function App() {
         if (targetPhase?.isFeedback) {
           const artifact: Artifact = {
             id: `dn-${Date.now()}`,
-            title: `Review: ${currentTask.title}`,
+            title: `Feedback: ${currentTask.title}`,
             text: '',
             type: 'feedback',
             projectId: currentTask.project || undefined,
@@ -497,33 +497,40 @@ export default function App() {
     const realId = resolveTaskId(taskId)
     if (demoMode) {
       const fakeBlocker: Blocker = { id: `b-${Date.now()}`, taskId, type: blocker.type, title: blocker.title, owner: blocker.owner, linkedTaskId: blocker.linkedTaskId, createdAt: new Date().toISOString() }
-      setTasks(prev => prev.map(t => t.id === taskId ? { ...t, blockers: [...(t.blockers ?? []), fakeBlocker] } : t))
+      const updateBlockers = (t: Task) => t.id === taskId ? { ...t, blockers: [...(t.blockers ?? []), fakeBlocker] } : t
+      setTasks(prev => prev.map(updateBlockers))
+      if (selectedTask?.id === taskId) setSelectedTask(prev => prev ? updateBlockers(prev) : prev)
       return
     }
     const created = await api.createBlocker(realId, blocker)
     if (created) {
-      setTasks(prev => prev.map(t => t.id === taskId ? { ...t, blockers: [...(t.blockers ?? []), created] } : t))
+      const updateBlockers = (t: Task) => t.id === taskId ? { ...t, blockers: [...(t.blockers ?? []), created] } : t
+      setTasks(prev => prev.map(updateBlockers))
+      if (selectedTask?.id === taskId) setSelectedTask(prev => prev ? updateBlockers(prev) : prev)
     } else {
       toast.error('Failed to create blocker')
     }
   }
 
   const handleResolveBlocker = async (taskId: string, blockerId: string, unresolve = false) => {
-    // Optimistic update
-    setTasks(prev => prev.map(t => t.id === taskId ? {
+    const updateBlockers = (t: Task): Task => t.id === taskId ? {
       ...t,
       blockers: (t.blockers ?? []).map(b => b.id === blockerId ? { ...b, resolvedAt: unresolve ? undefined : new Date().toISOString() } : b),
-    } : t))
+    } : t
+    setTasks(prev => prev.map(updateBlockers))
+    if (selectedTask?.id === taskId) setSelectedTask(prev => prev ? updateBlockers(prev) : prev)
     if (demoMode) return
     const result = unresolve ? await api.unresolveBlocker(blockerId) : await api.resolveBlocker(blockerId)
     if (!result) toast.error('Failed to update blocker')
   }
 
   const handleDeleteBlocker = async (taskId: string, blockerId: string) => {
-    setTasks(prev => prev.map(t => t.id === taskId ? {
+    const updateBlockers = (t: Task): Task => t.id === taskId ? {
       ...t,
       blockers: (t.blockers ?? []).filter(b => b.id !== blockerId),
-    } : t))
+    } : t
+    setTasks(prev => prev.map(updateBlockers))
+    if (selectedTask?.id === taskId) setSelectedTask(prev => prev ? updateBlockers(prev) : prev)
     if (demoMode) return
     const result = await api.deleteBlocker(blockerId)
     if (!result) toast.error('Failed to delete blocker')
@@ -1114,6 +1121,7 @@ export default function App() {
             onArtifactUpdate={handleArtifactUpdate}
             onArtifactDelete={handleArtifactDelete}
             onArtifactCreate={handleArtifactCreate}
+            onProjectUpdate={handleProjectUpdate}
             onViewChange={handleViewChange}
             onCreateBlocker={handleCreateBlocker}
             onResolveBlocker={handleResolveBlocker}

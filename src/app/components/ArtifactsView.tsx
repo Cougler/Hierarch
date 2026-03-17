@@ -67,7 +67,7 @@ export const ARTIFACT_TYPE_BG_COLORS: Record<string, string> = {
 };
 
 export const ARTIFACT_TYPE_LABELS: Record<string, string> = {
-  freeform: 'Quick Note',
+  freeform: 'Note',
   decision: 'Decision',
   feedback: 'Feedback',
   research: 'Research',

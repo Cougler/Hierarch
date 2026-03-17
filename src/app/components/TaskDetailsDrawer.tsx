@@ -34,6 +34,14 @@ import { ARTIFACT_TYPE_ICONS, ARTIFACT_TYPE_COLORS } from '@/app/components/Arti
 // ─── Phase color helpers ─────────────────────────────────────────────────────
 
 const PHASE_COLORS: Record<string, { color: string; bg: string }> = {
+  // Task statuses
+  'todo': { color: 'text-slate-600 dark:text-slate-400', bg: 'bg-slate-500/10' },
+  'in-progress': { color: 'text-blue-700 dark:text-blue-400', bg: 'bg-blue-500/10' },
+  'blocked': { color: 'text-red-700 dark:text-red-400', bg: 'bg-red-500/10' },
+  'feedback': { color: 'text-orange-700 dark:text-orange-400', bg: 'bg-orange-500/10' },
+  'done': { color: 'text-emerald-700 dark:text-emerald-400', bg: 'bg-emerald-500/10' },
+  // Project phases (for phase history display)
+  research: { color: 'text-rose-700 dark:text-rose-400', bg: 'bg-rose-500/10' },
   explore: { color: 'text-violet-700 dark:text-violet-400', bg: 'bg-violet-500/10' },
   design: { color: 'text-blue-700 dark:text-blue-400', bg: 'bg-blue-500/10' },
   iterate: { color: 'text-amber-700 dark:text-amber-400', bg: 'bg-amber-500/10' },
