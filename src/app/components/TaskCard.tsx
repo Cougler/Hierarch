@@ -4,7 +4,7 @@ import { useCallback } from 'react';
 import { cn } from '@/app/lib/utils';
 import { Badge } from '@/app/components/ui/badge';
 import { Checkbox } from '@/app/components/ui/checkbox';
-import { Calendar } from 'lucide-react';
+import { Calendar, Lock } from 'lucide-react';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { format, isToday, isPast, parseISO } from 'date-fns';
@@ -47,6 +47,7 @@ export function TaskCard({ task, projects, statuses, onUpdate, onDelete, onClick
   const parsed = task.dueDate ? parseISO(task.dueDate) : undefined;
   const overdue = parsed && isPast(parsed) && !isToday(parsed);
   const today = parsed && isToday(parsed);
+  const activeBlockerCount = (task.blockers ?? []).filter(b => !b.resolvedAt).length;
 
   const handleToggle = useCallback(() => {
     if (isDone && firstStatus) {
@@ -110,6 +111,13 @@ export function TaskCard({ task, projects, statuses, onUpdate, onDelete, onClick
                   {project.metadata?.icon && (() => { const I = getIconComponent(project.metadata!.icon); return <I className="mr-0.5 h-3 w-3 shrink-0" />; })()}
                   {project.name}
                 </Badge>
+              )}
+
+              {activeBlockerCount > 0 && (
+                <span className="inline-flex items-center gap-0.5 text-[10px] font-medium text-destructive/70">
+                  <Lock className="h-2.5 w-2.5" />
+                  {activeBlockerCount > 1 && activeBlockerCount}
+                </span>
               )}
 
               {parsed && (

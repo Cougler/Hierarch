@@ -195,7 +195,7 @@ export function CapacityView({ projects, tasks, onProjectClick }: CapacityViewPr
             return (
               <div
                 key={project.id}
-                className="relative border-b border-border/20 hover:bg-white/[0.018] transition-colors"
+                className="relative border-b border-border/20 hover:bg-accent/30 transition-colors"
                 style={{ height: ROW_HEIGHT }}
               >
                 {/* Week grid lines */}

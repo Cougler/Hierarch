@@ -41,16 +41,16 @@ export const ARTIFACT_TYPE_ICONS: Record<string, React.ElementType> = {
 };
 
 export const ARTIFACT_TYPE_COLORS: Record<string, string> = {
-  freeform: 'text-blue-400',
-  decision: 'text-amber-400',
-  feedback: 'text-emerald-400',
-  research: 'text-violet-400',
-  link: 'text-sky-400',
-  figma: 'text-pink-400',
-  prototype: 'text-orange-400',
-  screenshot: 'text-teal-400',
-  video: 'text-red-400',
-  doc: 'text-slate-400',
+  freeform: 'text-blue-700 dark:text-blue-400',
+  decision: 'text-amber-700 dark:text-amber-400',
+  feedback: 'text-emerald-700 dark:text-emerald-400',
+  research: 'text-violet-700 dark:text-violet-400',
+  link: 'text-sky-700 dark:text-sky-400',
+  figma: 'text-pink-700 dark:text-pink-400',
+  prototype: 'text-orange-700 dark:text-orange-400',
+  screenshot: 'text-teal-700 dark:text-teal-400',
+  video: 'text-red-700 dark:text-red-400',
+  doc: 'text-slate-600 dark:text-slate-400',
 };
 
 export const ARTIFACT_TYPE_BG_COLORS: Record<string, string> = {
@@ -67,7 +67,7 @@ export const ARTIFACT_TYPE_BG_COLORS: Record<string, string> = {
 };
 
 export const ARTIFACT_TYPE_LABELS: Record<string, string> = {
-  freeform: 'Freeform',
+  freeform: 'Quick Note',
   decision: 'Decision',
   feedback: 'Feedback',
   research: 'Research',

@@ -202,17 +202,29 @@ export function Briefing({
 
   // ─── Needs Attention ───
   const needsAttention = useMemo(() => {
-    const items: { task: Task; reason: string; urgency: 'feedback' | 'overdue' | 'stale' }[] = []
+    const items: { task: Task; reason: string; urgency: 'blocked' | 'feedback' | 'overdue' | 'stale' }[] = []
     const today = startOfDay(new Date())
     const staleThreshold = subDays(new Date(), 7)
+    const blockerStaleThreshold = subDays(new Date(), 3)
 
     for (const task of tasks) {
       if (doneStatuses.has(task.status)) continue
 
-      // In feedback phase
+      // Has active blockers
+      const activeBlockers = (task.blockers ?? []).filter(b => !b.resolvedAt)
+      if (activeBlockers.length > 0) {
+        const staleBlocker = activeBlockers.find(b => new Date(b.createdAt) < blockerStaleThreshold)
+        const reason = staleBlocker
+          ? `Blocked for ${formatDistanceToNow(new Date(staleBlocker.createdAt))}`
+          : `${activeBlockers.length} blocker${activeBlockers.length > 1 ? 's' : ''}`
+        items.push({ task, reason, urgency: 'blocked' })
+        continue
+      }
+
+      // In review phase
       const phase = statusMap.get(task.status)
       if (phase?.isFeedback) {
-        items.push({ task, reason: 'Waiting for feedback', urgency: 'feedback' })
+        items.push({ task, reason: 'In review', urgency: 'feedback' })
         continue
       }
 
@@ -234,8 +246,8 @@ export function Briefing({
       }
     }
 
-    // Sort: overdue first, then feedback, then stale
-    const order = { overdue: 0, feedback: 1, stale: 2 }
+    // Sort: blocked first, then overdue, feedback, stale
+    const order = { blocked: 0, overdue: 1, feedback: 2, stale: 3 }
     return items.sort((a, b) => order[a.urgency] - order[b.urgency])
   }, [tasks, statuses, doneStatuses])
 
@@ -293,19 +305,19 @@ export function Briefing({
 
           {/* ─── Stat Cards ─── */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-10">
-            <div className="border-t border-b border-white/[0.06] px-4 py-3">
+            <div className="border-t border-b border-border px-4 py-3">
               <p className="text-xl font-medium tracking-tight text-foreground/80">{projectCount}</p>
               <p className="text-[10px] text-muted-foreground/60 mt-1">Projects</p>
             </div>
-            <div className="border-t border-b border-white/[0.06] px-4 py-3">
+            <div className="border-t border-b border-border px-4 py-3">
               <p className="text-xl font-medium tracking-tight text-foreground/80">{activeTasks.length}</p>
               <p className="text-[10px] text-muted-foreground/60 mt-1">Active Tasks</p>
             </div>
-            <div className="border-t border-b border-white/[0.06] px-4 py-3">
-              <p className="text-xl font-medium tracking-tight text-orange-400/80">{needsAttention.length}</p>
+            <div className="border-t border-b border-border px-4 py-3">
+              <p className="text-xl font-medium tracking-tight text-attention">{needsAttention.length}</p>
               <p className="text-[10px] text-muted-foreground/60 mt-1">Needs Attention</p>
             </div>
-            <div className="border-t border-b border-white/[0.06] px-4 py-3">
+            <div className="border-t border-b border-border px-4 py-3">
               <p className="text-xl font-medium tracking-tight text-emerald-400/80">{completedTasks.length}</p>
               <p className="text-[10px] text-muted-foreground/60 mt-1">Completed</p>
             </div>
@@ -342,7 +354,7 @@ export function Briefing({
                       return (
                         <div
                           key={project.id}
-                          className="rounded-xl border border-white/[0.08] bg-white/[0.03] overflow-hidden"
+                          className="rounded-xl border border-border bg-card overflow-hidden"
                         >
                           {/* Project row */}
                           <div
@@ -361,7 +373,7 @@ export function Briefing({
                             </div>
                             <div className="flex items-center gap-1.5 shrink-0">
                               {projectAttention.length > 0 ? (
-                                <span className="text-[10px] text-amber-500/70">
+                                <span className="text-[10px] text-attention">
                                   {projectAttention.length} needs attention
                                 </span>
                               ) : null}
@@ -427,7 +439,7 @@ export function Briefing({
                           <button
                             key={`phase-${item.transition.id}`}
                             onClick={() => onTaskClick(item.task)}
-                            className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-left transition-colors hover:bg-white/[0.04]"
+                            className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-left transition-colors hover:bg-accent/50"
                           >
                             <div
                               className="w-2 h-2 rounded-full shrink-0"
@@ -438,7 +450,7 @@ export function Briefing({
                               <p className="text-[10px] text-muted-foreground mt-0.5">
                                 {isFeedbackTransition ? (
                                   <>
-                                    Moved to feedback
+                                    Moved to review
                                     {linkedNote && (
                                       <> with <span
                                         role="link"
@@ -465,7 +477,7 @@ export function Briefing({
                           <button
                             key={`task-${item.task.id}`}
                             onClick={() => onTaskClick(item.task)}
-                            className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-left transition-colors hover:bg-white/[0.04]"
+                            className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-left transition-colors hover:bg-accent/50"
                           >
                             <ListPlus className="h-3.5 w-3.5 text-blue-400 shrink-0" />
                             <div className="flex-1 min-w-0">
@@ -487,7 +499,7 @@ export function Briefing({
                           <button
                             key={`note-new-${item.note.id}`}
                             onClick={() => onArtifactClick(item.note)}
-                            className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-left transition-colors hover:bg-white/[0.04]"
+                            className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-left transition-colors hover:bg-accent/50"
                           >
                             <FileText className="h-3.5 w-3.5 text-violet-400 shrink-0" />
                             <div className="flex-1 min-w-0">
@@ -509,9 +521,9 @@ export function Briefing({
                           <button
                             key={`note-edit-${item.note.id}-${item.timestamp}`}
                             onClick={() => onArtifactClick(item.note)}
-                            className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-left transition-colors hover:bg-white/[0.04]"
+                            className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-left transition-colors hover:bg-accent/50"
                           >
-                            <PenLine className="h-3.5 w-3.5 text-amber-400 shrink-0" />
+                            <PenLine className="h-3.5 w-3.5 text-attention shrink-0" />
                             <div className="flex-1 min-w-0">
                               <p className="text-xs text-foreground truncate">{item.note.title || 'Untitled note'}</p>
                               <p className="text-[10px] text-muted-foreground mt-0.5">
@@ -531,7 +543,7 @@ export function Briefing({
                           <button
                             key={`proj-${item.project.id}`}
                             onClick={() => onViewChange(`project:${item.project.id}`)}
-                            className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-left transition-colors hover:bg-white/[0.04]"
+                            className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-left transition-colors hover:bg-accent/50"
                           >
                             <FolderPlus className="h-3.5 w-3.5 text-emerald-400 shrink-0" />
                             <div className="flex-1 min-w-0">

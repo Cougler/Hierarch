@@ -1020,11 +1020,11 @@ function ListView({
           </div>
           <div className="relative px-3">
             Task
-            <div onMouseDown={onResizeStart('title', widths.title)} className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-white/20 rounded" />
+            <div onMouseDown={onResizeStart('title', widths.title)} className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-border rounded" />
           </div>
           <div className="relative px-2">
             Project
-            <div onMouseDown={onResizeStart('project', widths.project)} className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-white/20 rounded" />
+            <div onMouseDown={onResizeStart('project', widths.project)} className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-border rounded" />
           </div>
           <div className="relative px-2">
             Due Date

@@ -47,19 +47,103 @@ export type ArtifactType = 'freeform' | 'decision' | 'feedback' | 'research' | '
 // ─── Type metadata ──────────────────────────────────────────────────────────
 
 const TYPE_META: { id: ArtifactType; label: string; icon: React.ElementType; color: string; bg: string }[] = [
-  { id: 'freeform', label: 'Freeform', icon: FileText, color: 'text-blue-400', bg: 'bg-blue-400/10' },
-  { id: 'decision', label: 'Decision', icon: PenLine, color: 'text-amber-400', bg: 'bg-amber-400/10' },
-  { id: 'feedback', label: 'Feedback', icon: MessageSquare, color: 'text-emerald-400', bg: 'bg-emerald-400/10' },
-  { id: 'research', label: 'Research', icon: FlaskConical, color: 'text-violet-400', bg: 'bg-violet-400/10' },
-  { id: 'link', label: 'Link', icon: Link2, color: 'text-sky-400', bg: 'bg-sky-400/10' },
-  { id: 'figma', label: 'Figma', icon: Figma, color: 'text-pink-400', bg: 'bg-pink-400/10' },
-  { id: 'prototype', label: 'Prototype', icon: Play, color: 'text-orange-400', bg: 'bg-orange-400/10' },
-  { id: 'screenshot', label: 'Screenshot', icon: Image, color: 'text-teal-400', bg: 'bg-teal-400/10' },
-  { id: 'video', label: 'Video', icon: Video, color: 'text-red-400', bg: 'bg-red-400/10' },
-  { id: 'doc', label: 'Doc', icon: FileCode, color: 'text-slate-400', bg: 'bg-slate-400/10' },
+  { id: 'freeform', label: 'Quick Note', icon: FileText, color: 'text-blue-700 dark:text-blue-400', bg: 'bg-blue-500/10' },
+  { id: 'decision', label: 'Decision', icon: PenLine, color: 'text-amber-700 dark:text-amber-400', bg: 'bg-amber-500/10' },
+  { id: 'feedback', label: 'Feedback', icon: MessageSquare, color: 'text-emerald-700 dark:text-emerald-400', bg: 'bg-emerald-500/10' },
+  { id: 'research', label: 'Research', icon: FlaskConical, color: 'text-violet-700 dark:text-violet-400', bg: 'bg-violet-500/10' },
+  { id: 'link', label: 'Link', icon: Link2, color: 'text-sky-700 dark:text-sky-400', bg: 'bg-sky-500/10' },
+  { id: 'figma', label: 'Figma', icon: Figma, color: 'text-pink-700 dark:text-pink-400', bg: 'bg-pink-500/10' },
+  { id: 'prototype', label: 'Prototype', icon: Play, color: 'text-orange-700 dark:text-orange-400', bg: 'bg-orange-500/10' },
+  { id: 'screenshot', label: 'Screenshot', icon: Image, color: 'text-teal-700 dark:text-teal-400', bg: 'bg-teal-500/10' },
+  { id: 'video', label: 'Video', icon: Video, color: 'text-red-700 dark:text-red-400', bg: 'bg-red-500/10' },
+  { id: 'doc', label: 'Doc', icon: FileCode, color: 'text-slate-600 dark:text-slate-400', bg: 'bg-slate-500/10' },
 ];
 
 const getTypeMeta = (id: ArtifactType) => TYPE_META.find(t => t.id === id) ?? TYPE_META[0]!;
+
+// Types that support a URL field
+const URL_TYPES: Partial<Record<ArtifactType, { placeholder: string; icon: React.ElementType; validate?: (url: string) => boolean }>> = {
+  link: { placeholder: 'Paste a URL...', icon: Link2 },
+  video: { placeholder: 'Paste a video link (YouTube, Vimeo, Loom)...', icon: Video },
+  prototype: { placeholder: 'Paste a prototype link (InVision, Marvel, ProtoPie)...', icon: Play },
+  screenshot: { placeholder: 'Paste an image URL...', icon: Image },
+  figma: {
+    placeholder: 'Paste a Figma link...',
+    icon: Figma,
+    validate: (url: string) => /^https:\/\/(www\.)?figma\.com\/(file|design|proto|board)\//.test(url.trim()),
+  },
+};
+
+function getYouTubeId(url: string): string | null {
+  const m = url.match(/(?:youtu\.be\/|youtube\.com\/(?:watch\?v=|embed\/|shorts\/))([a-zA-Z0-9_-]{11})/);
+  return m?.[1] ?? null;
+}
+
+function getVimeoId(url: string): string | null {
+  const m = url.match(/vimeo\.com\/(\d+)/);
+  return m?.[1] ?? null;
+}
+
+function getLoomId(url: string): string | null {
+  const m = url.match(/loom\.com\/share\/([a-f0-9]+)/);
+  return m?.[1] ?? null;
+}
+
+function getEmbedUrl(url: string): { embed: string; provider: string } | null {
+  const ytId = getYouTubeId(url);
+  if (ytId) return { embed: `https://www.youtube.com/embed/${ytId}`, provider: 'YouTube' };
+  const vimeoId = getVimeoId(url);
+  if (vimeoId) return { embed: `https://player.vimeo.com/video/${vimeoId}`, provider: 'Vimeo' };
+  const loomId = getLoomId(url);
+  if (loomId) return { embed: `https://www.loom.com/embed/${loomId}`, provider: 'Loom' };
+  return null;
+}
+
+const DOMAIN_LABELS: Record<string, string> = {
+  'youtube.com': 'YouTube Video',
+  'youtu.be': 'YouTube Video',
+  'vimeo.com': 'Vimeo Video',
+  'loom.com': 'Loom Recording',
+  'figma.com': 'Figma File',
+  'github.com': 'GitHub',
+  'notion.so': 'Notion Page',
+  'linear.app': 'Linear Issue',
+  'docs.google.com': 'Google Doc',
+  'drive.google.com': 'Google Drive',
+  'slack.com': 'Slack Message',
+  'miro.com': 'Miro Board',
+  'whimsical.com': 'Whimsical',
+  'excalidraw.com': 'Excalidraw',
+  'stackoverflow.com': 'Stack Overflow',
+  'medium.com': 'Medium Article',
+  'twitter.com': 'X Post',
+  'x.com': 'X Post',
+  'dribbble.com': 'Dribbble Shot',
+  'behance.net': 'Behance Project',
+  'vercel.app': 'Vercel Deploy',
+  'netlify.app': 'Netlify Deploy',
+};
+
+function getLinkLabel(url: string): string {
+  try {
+    const hostname = new URL(url).hostname.replace('www.', '');
+    // Check exact match first, then check if hostname ends with a known domain
+    if (DOMAIN_LABELS[hostname]) return DOMAIN_LABELS[hostname];
+    for (const [domain, label] of Object.entries(DOMAIN_LABELS)) {
+      if (hostname.endsWith(domain)) return label;
+    }
+    // Capitalize the domain name as fallback
+    const parts = hostname.split('.');
+    const name = parts.length > 1 ? parts[parts.length - 2] : parts[0];
+    return name.charAt(0).toUpperCase() + name.slice(1);
+  } catch {
+    return url;
+  }
+}
+
+function isImageUrl(url: string): boolean {
+  return /\.(png|jpe?g|gif|webp|svg|avif|bmp)(\?|$)/i.test(url);
+}
 
 // ─── Props ──────────────────────────────────────────────────────────────────
 
@@ -197,7 +281,7 @@ export function NoteDrawer({
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [title, setTitle] = useState('');
   const [activeType, setActiveType] = useState<ArtifactType>('freeform');
-  const [figmaUrl, setFigmaUrl] = useState('');
+  const [artifactUrl, setArtifactUrl] = useState('');
   const [figmaThumbnail, setFigmaThumbnail] = useState<string | null>(null);
   const [figmaLoading, setFigmaLoading] = useState(false);
   const [typeOpen, setTypeOpen] = useState(false);
@@ -231,14 +315,16 @@ export function NoteDrawer({
     }
   }, []);
 
+  const urlTypeConfig = URL_TYPES[activeType];
+
   // Sync state when note changes
   useEffect(() => {
     if (note) {
       setTitle(note.title);
       setActiveType(note.type);
-      setFigmaUrl(note.url || '');
+      setArtifactUrl(note.url || '');
       setFigmaThumbnail(null);
-      if (note.type === 'figma' && note.url && isFigmaUrl(note.url)) {
+      if (note.url && isFigmaUrl(note.url)) {
         fetchFigmaThumbnail(note.url);
       }
       requestAnimationFrame(() => {
@@ -300,16 +386,16 @@ export function NoteDrawer({
     }
   };
 
-  const handleFigmaUrlChange = (url: string) => {
-    setFigmaUrl(url);
+  const handleUrlChange = (url: string) => {
+    setArtifactUrl(url);
     if (note) {
       onUpdate(note.id, { url, updatedAt: new Date().toISOString() });
     }
   };
 
-  const handleFigmaUrlBlur = () => {
-    if (figmaUrl && isFigmaUrl(figmaUrl)) {
-      fetchFigmaThumbnail(figmaUrl);
+  const handleUrlBlur = () => {
+    if (artifactUrl && isFigmaUrl(artifactUrl)) {
+      fetchFigmaThumbnail(artifactUrl);
     } else {
       setFigmaThumbnail(null);
     }
@@ -330,6 +416,95 @@ export function NoteDrawer({
   };
 
   const [headingOpen, setHeadingOpen] = useState(false);
+  const [detectedLink, setDetectedLink] = useState<{ url: string; range: Range; top: number; left: number } | null>(null);
+
+  const detectLinkOnInput = useCallback(() => {
+    const sel = window.getSelection();
+    if (!sel || !sel.rangeCount || !editorRef.current) return;
+    const range = sel.getRangeAt(0);
+    const node = range.startContainer;
+    if (node.nodeType !== Node.TEXT_NODE || !node.textContent) { setDetectedLink(null); return; }
+
+    // Check if the text node contains a URL that just finished (followed by space or at end)
+    const text = node.textContent.slice(0, range.startOffset);
+    const urlMatch = text.match(/(https?:\/\/[^\s]+)\s?$/);
+    if (urlMatch && urlMatch[1]) {
+      const url = urlMatch[1];
+      // Don't detect if already inside an anchor
+      if (node.parentElement?.tagName === 'A') { setDetectedLink(null); return; }
+      const linkRange = document.createRange();
+      linkRange.setStart(node, urlMatch.index!);
+      linkRange.setEnd(node, urlMatch.index! + url.length);
+      const rangeRect = linkRange.getBoundingClientRect();
+      const editorRect = editorRef.current!.getBoundingClientRect();
+      setDetectedLink({
+        url,
+        range: linkRange,
+        top: rangeRect.bottom - editorRect.top + 4,
+        left: Math.max(0, rangeRect.left - editorRect.left),
+      });
+    } else {
+      setDetectedLink(null);
+    }
+  }, []);
+
+  const convertToLinkBadge = useCallback(() => {
+    if (!detectedLink || !editorRef.current) return;
+    const { url, range } = detectedLink;
+    let hostname = '';
+    try { hostname = new URL(url).hostname.replace('www.', ''); } catch { hostname = url; }
+    const label = getLinkLabel(url);
+    range.deleteContents();
+    const wrapper = document.createElement('span');
+    wrapper.className = 'hierarch-link-badge-wrap';
+    wrapper.contentEditable = 'false';
+    wrapper.innerHTML = `<a href="${url}" target="_blank" rel="noopener noreferrer" class="hierarch-link-badge"><img src="https://www.google.com/s2/favicons?domain=${hostname}&sz=16" alt="" style="width:12px;height:12px;border-radius:2px;vertical-align:middle;margin-right:4px;display:inline" />${label}</a><button class="hierarch-link-badge-close" title="Remove">&times;</button>`;
+    wrapper.querySelector('.hierarch-link-badge-close')?.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      wrapper.remove();
+      debouncedSave();
+    });
+    range.insertNode(wrapper);
+    // Move cursor after the badge
+    const after = document.createRange();
+    after.setStartAfter(badge);
+    after.collapse(true);
+    const sel = window.getSelection();
+    sel?.removeAllRanges();
+    sel?.addRange(after);
+    // Insert a space after
+    document.execCommand('insertText', false, ' ');
+    setDetectedLink(null);
+    debouncedSave();
+  }, [detectedLink, debouncedSave]);
+
+  const convertToLinkCard = useCallback(() => {
+    if (!detectedLink || !editorRef.current) return;
+    const { url, range } = detectedLink;
+    let hostname = '';
+    try { hostname = new URL(url).hostname.replace('www.', ''); } catch { hostname = url; }
+    const label = getLinkLabel(url);
+    range.deleteContents();
+    const card = document.createElement('a');
+    card.href = url;
+    card.target = '_blank';
+    card.rel = 'noopener noreferrer';
+    card.className = 'hierarch-link-card';
+    card.contentEditable = 'false';
+    card.innerHTML = `<span class="hierarch-link-card-inner"><img src="https://www.google.com/s2/favicons?domain=${hostname}&sz=32" alt="" /><span class="hierarch-link-card-text"><span class="hierarch-link-card-host">${label}</span><span class="hierarch-link-card-url">${url}</span></span><svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg></span>`;
+    range.insertNode(card);
+    // Move cursor after
+    const after = document.createRange();
+    after.setStartAfter(card);
+    after.collapse(true);
+    const sel = window.getSelection();
+    sel?.removeAllRanges();
+    sel?.addRange(after);
+    document.execCommand('insertText', false, '\n');
+    setDetectedLink(null);
+    debouncedSave();
+  }, [detectedLink, debouncedSave]);
 
   const handleLink = () => {
     const selection = window.getSelection();
@@ -421,7 +596,7 @@ export function NoteDrawer({
                         'flex items-center gap-2.5 rounded-lg px-3 py-2.5 text-xs transition-colors',
                         isActive
                           ? cn(t.bg, t.color, 'font-medium')
-                          : 'text-muted-foreground hover:bg-white/[0.06] hover:text-foreground',
+                          : 'text-muted-foreground hover:bg-surface hover:text-foreground',
                       )}
                     >
                       <Icon className={cn('h-4 w-4 shrink-0', isActive ? t.color : 'opacity-60')} />
@@ -446,7 +621,7 @@ export function NoteDrawer({
                     <button className={cn(
                       'flex flex-1 min-w-0 items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs transition-colors',
                       project
-                        ? 'bg-white/[0.04] text-foreground hover:bg-white/[0.07]'
+                        ? 'bg-surface text-foreground hover:bg-surface-hover'
                         : 'border border-dashed border-border/40 text-muted-foreground/40 hover:text-muted-foreground hover:border-border/60',
                     )}>
                       <FolderKanban className="h-3 w-3 shrink-0" />
@@ -463,7 +638,7 @@ export function NoteDrawer({
                 {project && (
                   <button
                     onClick={() => handleProjectChange(undefined)}
-                    className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-muted-foreground/30 hover:text-muted-foreground hover:bg-white/[0.06] transition-colors"
+                    className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-muted-foreground/30 hover:text-muted-foreground hover:bg-surface transition-colors"
                   >
                     <X className="h-3 w-3" />
                   </button>
@@ -482,7 +657,7 @@ export function NoteDrawer({
                     <button className={cn(
                       'flex flex-1 min-w-0 items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs transition-colors',
                       task
-                        ? 'bg-white/[0.04] text-foreground hover:bg-white/[0.07]'
+                        ? 'bg-surface text-foreground hover:bg-surface-hover'
                         : 'border border-dashed border-border/40 text-muted-foreground/40 hover:text-muted-foreground hover:border-border/60',
                     )}>
                       <CheckSquare className="h-3 w-3 shrink-0" />
@@ -499,7 +674,7 @@ export function NoteDrawer({
                 {task && (
                   <button
                     onClick={() => handleTaskChange(undefined)}
-                    className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-muted-foreground/30 hover:text-muted-foreground hover:bg-white/[0.06] transition-colors"
+                    className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-muted-foreground/30 hover:text-muted-foreground hover:bg-surface transition-colors"
                   >
                     <X className="h-3 w-3" />
                   </button>
@@ -508,68 +683,107 @@ export function NoteDrawer({
             </div>
           </div>
 
-          {/* Figma URL + preview */}
-          {activeType === 'figma' && (
+          {/* URL field + preview (for link, video, prototype, screenshot, figma) */}
+          {urlTypeConfig && (
             <div className="space-y-3">
               <div className="relative">
-                <Figma className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-pink-400/60" />
+                <urlTypeConfig.icon className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground/40" />
                 <Input
-                  value={figmaUrl}
-                  onChange={(e) => handleFigmaUrlChange(e.target.value)}
-                  onBlur={handleFigmaUrlBlur}
-                  onKeyDown={(e) => { if (e.key === 'Enter') handleFigmaUrlBlur(); }}
-                  placeholder="Paste a Figma link..."
-                  className="pl-8 pr-8 h-9 text-sm bg-white/[0.04] border-white/[0.08] placeholder:text-muted-foreground/40 w-full min-w-0"
+                  value={artifactUrl}
+                  onChange={(e) => handleUrlChange(e.target.value)}
+                  onBlur={handleUrlBlur}
+                  onKeyDown={(e) => { if (e.key === 'Enter') handleUrlBlur(); }}
+                  placeholder={urlTypeConfig.placeholder}
+                  className="pl-8 pr-8 h-9 text-sm bg-surface border-border placeholder:text-muted-foreground/40 w-full min-w-0"
                 />
-                {figmaUrl && isFigmaUrl(figmaUrl) && (
+                {artifactUrl && /^https?:\/\//.test(artifactUrl) && (
                   <a
-                    href={figmaUrl}
+                    href={artifactUrl}
                     target="_blank"
                     rel="noopener noreferrer"
                     onClick={(e) => e.stopPropagation()}
                     className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground/50 hover:text-foreground transition-colors"
-                    title="Open in Figma"
+                    title="Open link"
                   >
                     <ExternalLink className="h-3.5 w-3.5" />
                   </a>
                 )}
               </div>
 
-              {/* Thumbnail preview */}
-              {figmaLoading && (
-                <div className="flex items-center justify-center py-8 rounded-lg border border-white/[0.06] bg-white/[0.02]">
+              {/* Figma thumbnail preview */}
+              {activeType === 'figma' && figmaLoading && (
+                <div className="flex items-center justify-center py-8 rounded-lg border border-border bg-accent/50">
                   <Loader2 className="h-5 w-5 text-muted-foreground/40 animate-spin" />
                 </div>
               )}
-              {!figmaLoading && figmaThumbnail && (
+              {activeType === 'figma' && !figmaLoading && figmaThumbnail && (
                 <a
-                  href={figmaUrl}
+                  href={artifactUrl}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="block group/thumb rounded-lg overflow-hidden border border-white/[0.06] hover:border-pink-400/30 transition-colors"
+                  className="block group/thumb rounded-lg overflow-hidden border border-border hover:border-pink-400/30 transition-colors"
                 >
-                  <img
-                    src={figmaThumbnail}
-                    alt="Figma preview"
-                    className="w-full object-cover"
-                    style={{ maxHeight: 240 }}
-                  />
-                  <div className="flex items-center gap-1.5 px-3 py-2 bg-white/[0.02] text-xs text-muted-foreground/60 group-hover/thumb:text-pink-400/80 transition-colors">
+                  <img src={figmaThumbnail} alt="Figma preview" className="w-full object-cover" style={{ maxHeight: 240 }} />
+                  <div className="flex items-center gap-1.5 px-3 py-2 bg-accent/50 text-xs text-muted-foreground/60 group-hover/thumb:text-pink-400/80 transition-colors">
                     <Figma className="h-3 w-3" />
                     Open in Figma
                   </div>
                 </a>
               )}
-              {!figmaLoading && !figmaThumbnail && figmaUrl && isFigmaUrl(figmaUrl) && (
+              {activeType === 'figma' && !figmaLoading && !figmaThumbnail && artifactUrl && isFigmaUrl(artifactUrl) && (
+                <a href={artifactUrl} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 px-3 py-3 rounded-lg border border-border bg-accent/50 text-xs text-muted-foreground/60 hover:text-pink-400/80 hover:border-pink-400/30 transition-colors">
+                  <Figma className="h-4 w-4 text-pink-400/60" />
+                  <span className="flex-1 truncate">{artifactUrl}</span>
+                  <ExternalLink className="h-3 w-3 shrink-0" />
+                </a>
+              )}
+
+              {/* Video embed preview (YouTube, Vimeo, Loom) */}
+              {activeType === 'video' && artifactUrl && (() => {
+                const embed = getEmbedUrl(artifactUrl);
+                if (!embed) return null;
+                return (
+                  <div className="rounded-lg overflow-hidden border border-border">
+                    <iframe
+                      src={embed.embed}
+                      title={embed.provider}
+                      className="w-full aspect-video"
+                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                      allowFullScreen
+                    />
+                    <div className="flex items-center gap-1.5 px-3 py-2 bg-accent/50 text-xs text-muted-foreground/60">
+                      <Video className="h-3 w-3" />
+                      {embed.provider}
+                    </div>
+                  </div>
+                );
+              })()}
+
+              {/* Image preview for screenshot type */}
+              {activeType === 'screenshot' && artifactUrl && isImageUrl(artifactUrl) && (
+                <div className="rounded-lg overflow-hidden border border-border">
+                  <img src={artifactUrl} alt="Screenshot" className="w-full object-cover" style={{ maxHeight: 300 }} />
+                </div>
+              )}
+
+              {/* Generic link preview for link/prototype */}
+              {(activeType === 'link' || activeType === 'prototype') && artifactUrl && /^https?:\/\//.test(artifactUrl) && (
                 <a
-                  href={figmaUrl}
+                  href={artifactUrl}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="flex items-center gap-2 px-3 py-3 rounded-lg border border-white/[0.06] bg-white/[0.02] text-xs text-muted-foreground/60 hover:text-pink-400/80 hover:border-pink-400/30 transition-colors"
+                  className="flex items-center gap-3 px-3 py-3 rounded-lg border border-border bg-accent/50 text-xs transition-colors hover:border-primary/30"
                 >
-                  <Figma className="h-4 w-4 text-pink-400/60" />
-                  <span className="flex-1 truncate">{figmaUrl}</span>
-                  <ExternalLink className="h-3 w-3 shrink-0" />
+                  <img
+                    src={`https://www.google.com/s2/favicons?domain=${new URL(artifactUrl).hostname}&sz=32`}
+                    alt=""
+                    className="h-4 w-4 shrink-0 rounded"
+                  />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-foreground/80 truncate">{new URL(artifactUrl).hostname.replace('www.', '')}</p>
+                    <p className="text-muted-foreground/40 truncate text-[10px]">{artifactUrl}</p>
+                  </div>
+                  <ExternalLink className="h-3 w-3 shrink-0 text-muted-foreground/40" />
                 </a>
               )}
             </div>
@@ -646,24 +860,63 @@ export function NoteDrawer({
           </div>
 
           {/* Editor */}
+          <div className="relative">
           <div
             ref={editorRef}
             contentEditable
             suppressContentEditableWarning
-            onInput={debouncedSave}
+            onInput={() => { debouncedSave(); detectLinkOnInput(); }}
             onKeyDown={(e) => {
               if ((e.metaKey || e.ctrlKey) && e.key === 'b') { e.preventDefault(); exec('bold'); }
               if ((e.metaKey || e.ctrlKey) && e.key === 'i') { e.preventDefault(); exec('italic'); }
               if ((e.metaKey || e.ctrlKey) && e.key === 'k') { e.preventDefault(); handleLink(); }
             }}
-            className="min-h-[200px] outline-none text-sm text-foreground/90 leading-relaxed [&_h1]:text-xl [&_h1]:font-bold [&_h1]:mt-5 [&_h1]:mb-2 [&_h2]:text-base [&_h2]:font-semibold [&_h2]:mt-4 [&_h2]:mb-2 [&_h3]:text-sm [&_h3]:font-medium [&_h3]:mt-3 [&_h3]:mb-1.5 [&_ul]:list-disc [&_ul]:pl-5 [&_ul]:my-2 [&_ol]:list-decimal [&_ol]:pl-5 [&_ol]:my-2 [&_li]:my-0.5 [&_a]:text-primary [&_a]:underline [&_a]:underline-offset-2 [&_a:hover]:text-primary/80 [&_blockquote]:border-l-2 [&_blockquote]:border-primary/40 [&_blockquote]:pl-3 [&_blockquote]:italic [&_blockquote]:text-muted-foreground [&_blockquote]:my-2 [&_hr]:border-border/30 [&_hr]:my-4 placeholder:text-muted-foreground/40"
+            style={{ maxWidth: 'calc(420px - 40px)' }}
+            className="min-h-[200px] w-full outline-none text-sm text-foreground/90 leading-relaxed [word-break:break-word] [overflow-wrap:anywhere] [&_h1]:text-xl [&_h1]:font-bold [&_h1]:mt-5 [&_h1]:mb-2 [&_h2]:text-base [&_h2]:font-semibold [&_h2]:mt-4 [&_h2]:mb-2 [&_h3]:text-sm [&_h3]:font-medium [&_h3]:mt-3 [&_h3]:mb-1.5 [&_ul]:list-disc [&_ul]:pl-5 [&_ul]:my-2 [&_ol]:list-decimal [&_ol]:pl-5 [&_ol]:my-2 [&_li]:my-0.5 [&_a]:text-primary [&_a]:underline [&_a]:underline-offset-2 [&_a]:break-all [&_a:hover]:text-primary/80 [&_blockquote]:border-l-2 [&_blockquote]:border-primary/40 [&_blockquote]:pl-3 [&_blockquote]:italic [&_blockquote]:text-muted-foreground [&_blockquote]:my-2 [&_hr]:border-border/30 [&_hr]:my-4 placeholder:text-muted-foreground/40"
             data-placeholder="Start writing..."
           />
+
+          {/* Link detected tooltip */}
+          <AnimatePresence>
+            {detectedLink && (
+              <motion.div
+                initial={{ opacity: 0, y: 4 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: 4 }}
+                transition={{ duration: 0.12 }}
+                style={{ position: 'absolute', top: detectedLink.top, left: detectedLink.left }}
+                className="z-10 flex items-center gap-1.5 px-2 py-1.5 rounded-lg border border-border bg-popover shadow-md"
+              >
+                <span className="text-[10px] text-muted-foreground/60 mr-1">Link detected</span>
+                <button
+                  onClick={convertToLinkBadge}
+                  className="flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium bg-primary/10 text-primary hover:bg-primary/20 transition-colors"
+                >
+                  <Link2 className="h-2.5 w-2.5" />
+                  Badge
+                </button>
+                <button
+                  onClick={convertToLinkCard}
+                  className="flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium bg-primary/10 text-primary hover:bg-primary/20 transition-colors"
+                >
+                  <ExternalLink className="h-2.5 w-2.5" />
+                  Card
+                </button>
+                <button
+                  onClick={() => setDetectedLink(null)}
+                  className="text-muted-foreground/30 hover:text-muted-foreground transition-colors ml-0.5"
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              </motion.div>
+            )}
+          </AnimatePresence>
+          </div>
         </div>
       </ScrollArea>
 
       {/* Footer — pinned */}
-      <div className="shrink-0 flex items-center justify-between border-t border-white/[0.06] px-5 py-3">
+      <div className="shrink-0 flex items-center justify-between border-t border-border px-5 py-3">
         <span className="text-[11px] text-muted-foreground/40">
           {formatTimestamp(note.updatedAt || note.timestamp)}
         </span>
@@ -746,8 +999,7 @@ export function NoteDrawer({
               whileHover={{ opacity: 1 }}
               transition={{ delay: 0.25, type: 'spring', stiffness: 320, damping: 28 }}
               onClick={() => onOpenChange(false)}
-              style={{ backgroundColor: '#1c1c1a' }}
-              className="fixed top-8 right-[460px] z-50 flex h-[60px] w-8 items-center justify-center rounded-full text-muted-foreground shadow-lg border border-white/[0.08] hover:text-foreground transition-colors"
+              className="fixed top-8 right-[460px] z-50 flex h-[60px] w-8 items-center justify-center rounded-full bg-drawer text-muted-foreground shadow-lg border border-border hover:text-foreground transition-colors"
             >
               <X className="h-3.5 w-3.5" />
             </motion.button>
@@ -759,8 +1011,8 @@ export function NoteDrawer({
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.88 }}
               transition={{ type: 'spring', stiffness: 420, damping: 32, mass: 0.7 }}
-              style={{ backgroundColor: '#1c1c1a', transformOrigin: 'top right' }}
-              className="fixed top-8 right-8 bottom-8 z-50 w-[420px] rounded-2xl shadow-2xl border border-white/[0.08] overflow-hidden flex flex-col"
+              style={{ transformOrigin: 'top right' }}
+              className="fixed top-8 right-8 bottom-8 z-50 w-[420px] rounded-2xl bg-drawer shadow-2xl border border-border overflow-hidden flex flex-col"
             >
               <div className="flex-1 min-h-0 overflow-y-auto">{content}</div>
             </motion.div>

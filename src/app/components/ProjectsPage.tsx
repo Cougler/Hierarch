@@ -338,7 +338,7 @@ function NewProjectDrawer({
             exit={{ opacity: 0 }}
             transition={{ duration: 0.15 }}
             onClick={() => onOpenChange(false)}
-            className="fixed top-8 right-[448px] z-50 flex h-8 w-8 items-center justify-center rounded-full bg-white/[0.06] text-muted-foreground shadow-lg border border-white/[0.08] hover:bg-white/[0.12] hover:text-foreground transition-colors"
+            className="fixed top-8 right-[448px] z-50 flex h-8 w-8 items-center justify-center rounded-full bg-drawer text-muted-foreground shadow-lg border border-border hover:bg-surface-hover hover:text-foreground transition-colors"
           >
             <X className="h-3.5 w-3.5" />
           </motion.button>
@@ -350,8 +350,8 @@ function NewProjectDrawer({
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 0.88 }}
             transition={{ type: 'spring', stiffness: 420, damping: 32, mass: 0.7 }}
-            style={{ backgroundColor: '#1c1c1a', transformOrigin: 'top right' }}
-            className="fixed top-8 right-8 bottom-8 z-50 w-[408px] rounded-2xl shadow-2xl border border-white/[0.08] flex flex-col overflow-hidden"
+            style={{ transformOrigin: 'top right' }}
+            className="fixed top-8 right-8 bottom-8 z-50 w-[408px] rounded-2xl bg-drawer shadow-2xl border border-border flex flex-col overflow-hidden"
           >
             <div className="flex-1 flex flex-col gap-4 p-5 overflow-auto">
               <h3 className="text-sm font-semibold text-foreground">New project</h3>
@@ -363,7 +363,7 @@ function NewProjectDrawer({
                 value={name}
                 onChange={e => setName(e.target.value)}
                 onKeyDown={e => e.key === 'Enter' && handleCreate()}
-                className="bg-white/[0.04] border-white/[0.08] text-sm placeholder:text-muted-foreground/50 focus-visible:ring-white/20"
+                className="bg-surface border-border text-sm placeholder:text-muted-foreground/50 focus-visible:ring-ring/30"
               />
 
               {/* Description */}
@@ -371,7 +371,7 @@ function NewProjectDrawer({
                 placeholder="Description (optional)"
                 value={description}
                 onChange={e => setDescription(e.target.value)}
-                className="min-h-[100px] resize-none bg-white/[0.04] border-white/[0.08] text-sm placeholder:text-muted-foreground/50 focus-visible:ring-white/20"
+                className="min-h-[100px] resize-none bg-surface border-border text-sm placeholder:text-muted-foreground/50 focus-visible:ring-ring/30"
               />
 
               {/* Icon */}
@@ -388,8 +388,8 @@ function NewProjectDrawer({
                         className={cn(
                           'flex h-8 w-8 items-center justify-center rounded-md transition-colors',
                           icon === name
-                            ? 'bg-white/[0.1] text-foreground'
-                            : 'text-muted-foreground/60 hover:bg-white/[0.06] hover:text-foreground',
+                            ? 'bg-surface-hover text-foreground'
+                            : 'text-muted-foreground/60 hover:bg-surface hover:text-foreground',
                         )}
                       >
                         <Icon className="h-4 w-4" style={icon === name ? { color } : undefined} />
@@ -412,7 +412,7 @@ function NewProjectDrawer({
                       style={{
                         backgroundColor: hex,
                         boxShadow: color === hex
-                          ? `0 0 0 2px #1c1c1a, 0 0 0 3.5px ${hex}`
+                          ? `0 0 0 2px var(--drawer), 0 0 0 3.5px ${hex}`
                           : 'none',
                       }}
                     />

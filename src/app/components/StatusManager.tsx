@@ -221,7 +221,7 @@ export function StatusManager({ statuses: initialStatuses, onChange, open, onOpe
         <DialogHeader>
           <DialogTitle>Manage Phases</DialogTitle>
           <DialogDescription>
-            Configure design phases. Drag to reorder. Mark one as feedback (prompts for reviewer) and one as handoff (marks tasks complete).
+            Configure design phases. Drag to reorder. Mark one as review (prompts for reviewer) and one as handoff (marks tasks complete).
           </DialogDescription>
         </DialogHeader>
 

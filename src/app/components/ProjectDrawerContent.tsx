@@ -65,7 +65,7 @@ export function ProjectDrawerContent({
     for (const task of projActiveTasks) {
       const phase = statusMap.get(task.status);
       if (phase?.isFeedback) {
-        items.push({ task, reason: 'Waiting for feedback', urgency: 'feedback' });
+        items.push({ task, reason: 'In review', urgency: 'feedback' });
         continue;
       }
       if (task.dueDate) {
@@ -107,15 +107,15 @@ export function ProjectDrawerContent({
 
           {/* Stats row */}
           <div className="grid grid-cols-3 gap-3">
-            <div className="rounded-lg border border-white/[0.08] bg-white/[0.04] px-3 py-2.5">
+            <div className="rounded-lg border border-border bg-surface px-3 py-2.5">
               <p className="text-lg font-semibold">{projActiveTasks.length}</p>
               <p className="text-[10px] text-muted-foreground">Active</p>
             </div>
-            <div className="rounded-lg border border-white/[0.08] bg-white/[0.04] px-3 py-2.5">
+            <div className="rounded-lg border border-border bg-surface px-3 py-2.5">
               <p className="text-lg font-semibold text-emerald-400">{projDoneTasks.length}</p>
               <p className="text-[10px] text-muted-foreground">Done</p>
             </div>
-            <div className="rounded-lg border border-white/[0.08] bg-white/[0.04] px-3 py-2.5">
+            <div className="rounded-lg border border-border bg-surface px-3 py-2.5">
               <p className="text-lg font-semibold">{projNotes.length}</p>
               <p className="text-[10px] text-muted-foreground">Notes</p>
             </div>
@@ -130,7 +130,7 @@ export function ProjectDrawerContent({
                   <button
                     key={item.task.id}
                     onClick={() => onTaskClick(item.task)}
-                    className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-left transition-colors hover:bg-white/[0.04]"
+                    className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-left transition-colors hover:bg-surface"
                   >
                     <div
                       className="w-1.5 h-1.5 rounded-full shrink-0"
@@ -164,7 +164,7 @@ export function ProjectDrawerContent({
                     <button
                       key={task.id}
                       onClick={() => onTaskClick(task)}
-                      className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-left transition-colors hover:bg-white/[0.04]"
+                      className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-left transition-colors hover:bg-surface"
                     >
                       <span className={cn('h-2 w-2 rounded-full shrink-0', sc?.color ?? 'bg-slate-500')} />
                       <span className="text-xs text-foreground truncate">{task.title}</span>
@@ -197,7 +197,7 @@ export function ProjectDrawerContent({
                   <button
                     key={note.id}
                     onClick={() => onArtifactClick(note)}
-                    className="w-full px-3 py-2 rounded-lg text-left transition-colors hover:bg-white/[0.04]"
+                    className="w-full px-3 py-2 rounded-lg text-left transition-colors hover:bg-surface"
                   >
                     <p className="text-xs text-foreground/80 truncate">
                       {note.title || note.text || 'Untitled note'}

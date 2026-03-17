@@ -51,7 +51,7 @@ const steps: Step[] = [
           <img src="/logo.svg" className="h-10 w-10" alt="Hierarch" />
         </div>
         <p className="max-w-md text-center leading-relaxed text-muted-foreground">
-          Hierarch organizes your design projects around nonlinear phases — explore, define, refine, get feedback, and hand off — instead of a rigid status pipeline.
+          Hierarch organizes your design projects around nonlinear phases — explore, design, iterate, review, and hand off — instead of a rigid status pipeline.
         </p>
       </div>
     ),
@@ -94,11 +94,11 @@ const steps: Step[] = [
           <div className="flex items-center justify-center gap-2 text-xs text-muted-foreground/80">
             <span className="rounded bg-violet-500/20 px-1.5 py-0.5 text-violet-400">Explore</span>
             <ArrowRight className="h-3 w-3" />
-            <span className="rounded bg-blue-500/20 px-1.5 py-0.5 text-blue-400">Define</span>
+            <span className="rounded bg-blue-500/20 px-1.5 py-0.5 text-blue-400">Design</span>
             <ArrowRight className="h-3 w-3" />
-            <span className="rounded bg-amber-500/20 px-1.5 py-0.5 text-amber-400">Refine</span>
+            <span className="rounded bg-amber-500/20 px-1.5 py-0.5 text-amber-400">Iterate</span>
             <ArrowRight className="h-3 w-3" />
-            <span className="rounded bg-orange-500/20 px-1.5 py-0.5 text-orange-400">Feedback</span>
+            <span className="rounded bg-orange-500/20 px-1.5 py-0.5 text-orange-400">Review</span>
             <ArrowRight className="h-3 w-3" />
             <span className="rounded bg-emerald-500/20 px-1.5 py-0.5 text-emerald-400">Handoff</span>
           </div>

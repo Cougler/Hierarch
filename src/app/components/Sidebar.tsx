@@ -16,7 +16,7 @@ import {
 import {
   Compass, ListTodo, Plus, Pencil, Copy, Trash2,
   ChevronDown, LogOut, Settings, User, Moon, Sun, X, BarChart2,
-  SquarePen, CheckSquare, Gem, Plug,
+  SquarePen, CheckSquare, Gem, Plug, FileText,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useTheme } from '@/app/components/ThemeProvider';
@@ -34,6 +34,7 @@ interface SidebarProps {
   onLogout: () => void;
   onShowOnboarding: () => void;
   onNewTask: () => void;
+  onNewArtifact?: () => void;
   onProjectCreate: (name: string, metadata?: ProjectMetadata) => void;
   onProjectUpdate: (id: string, updates: Partial<Project>) => void;
   onProjectDelete: (id: string) => void;
@@ -88,6 +89,7 @@ export function Sidebar({
   onLogout,
   onShowOnboarding,
   onNewTask,
+  onNewArtifact,
   onProjectCreate,
   onProjectUpdate,
   onProjectDelete,
@@ -143,11 +145,11 @@ export function Sidebar({
   };
 
   const sidebarContent = (
-    <div className="flex h-full w-60 flex-col" style={{ backgroundColor: '#262624' }}>
+    <div className="flex h-full w-60 flex-col bg-shell">
       {/* Header: logo + create */}
       <div className="flex items-center gap-2 px-4 py-4">
         <div className="flex flex-1 items-center">
-          <img src="/logo.svg" className="h-5 w-5 opacity-50" alt="Hierarch" />
+          <img src="/logo.svg" className="h-5 w-5" alt="Hierarch" />
         </div>
 
         <DropdownMenu>
@@ -160,6 +162,11 @@ export function Sidebar({
             <DropdownMenuItem onClick={() => { onNewTask(); onClose?.(); }}>
               <CheckSquare className="mr-2 h-4 w-4" /> New Task
             </DropdownMenuItem>
+            {onNewArtifact && (
+              <DropdownMenuItem onClick={() => { onNewArtifact(); onClose?.(); }}>
+                <FileText className="mr-2 h-4 w-4" /> New Artifact
+              </DropdownMenuItem>
+            )}
             <DropdownMenuItem onClick={() => setCreatingProject(true)}>
               <Plus className="mr-2 h-4 w-4" /> New Project
             </DropdownMenuItem>
@@ -235,7 +242,7 @@ export function Sidebar({
                       if (e.key === 'Escape') setRenameTarget(null);
                     }}
                     onBlur={handleRenameSubmit}
-                    className="h-6 text-sm bg-white/[0.06] border-white/[0.1] px-1.5 py-0"
+                    className="h-6 text-sm bg-surface border-border px-1.5 py-0"
                   />
                 </div>
               );
@@ -287,7 +294,7 @@ export function Sidebar({
                   if (e.key === 'Escape') { setCreatingProject(false); setNewProjectName(''); }
                 }}
                 onBlur={handleNewProjectSubmit}
-                className="h-6 text-sm bg-white/[0.06] border-white/[0.1] px-1.5 py-0 placeholder:text-foreground/30"
+                className="h-6 text-sm bg-surface border-border px-1.5 py-0 placeholder:text-foreground/30"
               />
             </div>
           )}
@@ -329,7 +336,7 @@ export function Sidebar({
                   : 'text-foreground/60 hover:bg-accent/60 hover:text-foreground'
               )}
             >
-              <img src="/linear.svg" alt="Linear" className="h-3.5 w-3.5 shrink-0 opacity-50" />
+              <img src="/linear.svg" alt="Linear" className="h-3.5 w-3.5 shrink-0 opacity-50 invert-on-light" />
               <span className="flex-1 text-left">Linear</span>
             </button>
           </div>

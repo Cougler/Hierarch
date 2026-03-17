@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { AnimatePresence, motion } from 'motion/react'
 import { Toaster, toast } from 'sonner'
 import { supabase } from './supabase-client'
-import type { Task, Project, StatusConfig, TimeEntry, WaitingForItem, PhaseTransition } from './types'
+import type { Task, Project, StatusConfig, TimeEntry, Blocker, BlockerType, PhaseTransition } from './types'
 import { DEFAULT_STATUSES } from './types'
 import * as api from './api/data'
 import { DEMO_USER, DEMO_PROJECTS, DEMO_TASKS, DEMO_TIME_ENTRIES, DEMO_DESIGN_NOTES, STARTER_PROJECTS, STARTER_TASKS, STARTER_DESIGN_NOTES } from './demo-data'
@@ -196,9 +196,14 @@ export default function App() {
   const loadData = async () => {
     if (demoMode) { setDataLoading(false); return }
     setDataLoading(true)
-    const [projectsData, tasksData] = await Promise.all([
+
+    // Run one-time migration from waitingFor to blockers (non-blocking)
+    api.migrateWaitingForToBlockers().catch(() => {})
+
+    const [projectsData, tasksData, blockersData] = await Promise.all([
       api.getProjects(),
       api.getTasks(),
+      api.getBlockersForUser(),
     ])
 
     // Seed starter data for brand-new accounts
@@ -210,7 +215,19 @@ export default function App() {
     }
 
     if (projectsData) setProjects(projectsData)
-    if (tasksData) setTasks(tasksData)
+    if (tasksData) {
+      // Attach blockers to their tasks
+      const blockersByTask = new Map<string, Blocker[]>()
+      for (const b of blockersData) {
+        const list = blockersByTask.get(b.taskId) || []
+        list.push(b)
+        blockersByTask.set(b.taskId, list)
+      }
+      setTasks(tasksData.map(t => {
+        const taskBlockers = blockersByTask.get(t.id)
+        return taskBlockers ? { ...t, blockers: taskBlockers } : t
+      }))
+    }
     setDataLoading(false)
     loadTimeEntries()
   }
@@ -355,8 +372,9 @@ export default function App() {
   }
 
   // Task operations
-  const handleTaskCreate = async (taskData: Partial<Task>) => {
+  const handleTaskCreate = async (taskData: Partial<Task> & { pendingBlockers?: { type: BlockerType; title: string; owner?: string }[] }) => {
     const tempId = Math.random().toString(36).substr(2, 9)
+    const pendingBlockers = taskData.pendingBlockers
     const newTask: Task = {
       id: tempId,
       title: taskData.title || '',
@@ -367,7 +385,6 @@ export default function App() {
       assignees: taskData.assignees || [],
       order: tasks.length,
       project: taskData.project,
-      waitingFor: taskData.waitingFor || [],
     }
 
     setTasks(prev => [...prev, newTask])
@@ -385,6 +402,19 @@ export default function App() {
 
     if (result) {
       tempIdMapping.current[tempId] = result.id
+      // Create any pending blockers for the new task
+      if (pendingBlockers?.length) {
+        const created: Blocker[] = []
+        for (const b of pendingBlockers) {
+          const blocker = await api.createBlocker(result.id, b)
+          if (blocker) created.push(blocker)
+        }
+        if (created.length > 0) {
+          setTasks(prev => prev.map(t =>
+            t.id === tempId ? { ...t, blockers: created } : t
+          ))
+        }
+      }
     } else {
       toast.error('Failed to create task')
       setTasks(prev => prev.filter(t => t.id !== tempId))
@@ -414,7 +444,7 @@ export default function App() {
         if (targetPhase?.isFeedback) {
           const artifact: Artifact = {
             id: `dn-${Date.now()}`,
-            title: `Feedback: ${currentTask.title}`,
+            title: `Review: ${currentTask.title}`,
             text: '',
             type: 'feedback',
             projectId: currentTask.project || undefined,
@@ -462,6 +492,43 @@ export default function App() {
     else toast.success('Task deleted')
   }
 
+  // Blocker operations
+  const handleCreateBlocker = async (taskId: string, blocker: { type: BlockerType; title: string; owner?: string; linkedTaskId?: string }) => {
+    const realId = resolveTaskId(taskId)
+    if (demoMode) {
+      const fakeBlocker: Blocker = { id: `b-${Date.now()}`, taskId, type: blocker.type, title: blocker.title, owner: blocker.owner, linkedTaskId: blocker.linkedTaskId, createdAt: new Date().toISOString() }
+      setTasks(prev => prev.map(t => t.id === taskId ? { ...t, blockers: [...(t.blockers ?? []), fakeBlocker] } : t))
+      return
+    }
+    const created = await api.createBlocker(realId, blocker)
+    if (created) {
+      setTasks(prev => prev.map(t => t.id === taskId ? { ...t, blockers: [...(t.blockers ?? []), created] } : t))
+    } else {
+      toast.error('Failed to create blocker')
+    }
+  }
+
+  const handleResolveBlocker = async (taskId: string, blockerId: string, unresolve = false) => {
+    // Optimistic update
+    setTasks(prev => prev.map(t => t.id === taskId ? {
+      ...t,
+      blockers: (t.blockers ?? []).map(b => b.id === blockerId ? { ...b, resolvedAt: unresolve ? undefined : new Date().toISOString() } : b),
+    } : t))
+    if (demoMode) return
+    const result = unresolve ? await api.unresolveBlocker(blockerId) : await api.resolveBlocker(blockerId)
+    if (!result) toast.error('Failed to update blocker')
+  }
+
+  const handleDeleteBlocker = async (taskId: string, blockerId: string) => {
+    setTasks(prev => prev.map(t => t.id === taskId ? {
+      ...t,
+      blockers: (t.blockers ?? []).filter(b => b.id !== blockerId),
+    } : t))
+    if (demoMode) return
+    const result = await api.deleteBlocker(blockerId)
+    if (!result) toast.error('Failed to delete blocker')
+  }
+
   const closeAllDrawers = () => {
     setNewTaskDrawerOpen(false)
     setDrawerStack([])
@@ -497,6 +564,32 @@ export default function App() {
     setSelectedArtifact(artifact)
     setDrawerDirection(1)
     setDrawerStack([{ type: 'artifact', artifactId: artifact.id }])
+  }
+
+  const handleArtifactCreateForTask = (taskId: string) => {
+    const task = tasks.find(t => t.id === taskId)
+    const artifact: Artifact = {
+      id: `dn-${Date.now()}`,
+      title: '',
+      text: '',
+      type: 'freeform',
+      projectId: task?.project || undefined,
+      taskId,
+      timestamp: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    }
+    setArtifacts(prev => [artifact, ...prev])
+    // Push artifact onto drawer stack if a drawer is open
+    if (drawerStack.length > 0) {
+      setSelectedArtifact(artifact)
+      setDrawerDirection(1)
+      setDrawerStack(prev => [...prev, { type: 'artifact', artifactId: artifact.id }])
+    } else {
+      closeAllDrawers()
+      setSelectedArtifact(artifact)
+      setDrawerDirection(1)
+      setDrawerStack([{ type: 'artifact', artifactId: artifact.id }])
+    }
   }
 
   const handleArtifactClick = (artifact: Artifact) => {
@@ -905,7 +998,7 @@ export default function App() {
     <ThemeProvider defaultTheme="dark">
       <TooltipProvider>
         <Toaster richColors position="top-right" />
-        <div className="flex h-screen overflow-hidden" style={{ backgroundColor: '#262624' }}>
+        <div className="flex h-screen overflow-hidden bg-shell">
           {/* Desktop sidebar */}
           {!isMobile && (
             <Sidebar
@@ -918,6 +1011,7 @@ export default function App() {
               onLogout={handleLogout}
               onShowOnboarding={() => setShowOnboarding(true)}
               onNewTask={() => handleOpenNewTask()}
+              onNewArtifact={() => handleArtifactCreate('')}
               onProjectCreate={handleProjectCreate}
               onProjectUpdate={handleProjectUpdate}
               onProjectDelete={handleProjectDelete}
@@ -936,6 +1030,7 @@ export default function App() {
               onLogout={handleLogout}
               onShowOnboarding={() => setShowOnboarding(true)}
               onNewTask={() => handleOpenNewTask()}
+              onNewArtifact={() => handleArtifactCreate('')}
               onProjectCreate={handleProjectCreate}
               onProjectUpdate={handleProjectUpdate}
               onProjectDelete={handleProjectDelete}
@@ -946,7 +1041,7 @@ export default function App() {
 
           {/* Main content */}
           <motion.main
-            className="flex-1 flex flex-col overflow-hidden bg-background rounded-xl mt-2 mr-2 mb-2 ml-0 border border-white/[0.06]"
+            className="flex-1 flex flex-col overflow-hidden bg-background rounded-xl mt-2 mr-2 mb-2 ml-0 border border-shell-border"
             initial={{ x: 24, opacity: 0 }}
             animate={{ x: 0, opacity: 1 }}
             transition={{ duration: 0.35, ease: 'easeOut' }}
@@ -1020,6 +1115,10 @@ export default function App() {
             onArtifactDelete={handleArtifactDelete}
             onArtifactCreate={handleArtifactCreate}
             onViewChange={handleViewChange}
+            onCreateBlocker={handleCreateBlocker}
+            onResolveBlocker={handleResolveBlocker}
+            onDeleteBlocker={handleDeleteBlocker}
+            onArtifactCreateForTask={handleArtifactCreateForTask}
           />
 
           {/* Mobile fallback drawers */}
@@ -1034,6 +1133,10 @@ export default function App() {
               onUpdate={handleTaskUpdate}
               onDelete={(id) => { handleTaskDelete(id); closeAllDrawers(); }}
               onArtifactClick={pushDrawerArtifact}
+              onCreateBlocker={handleCreateBlocker}
+              onResolveBlocker={handleResolveBlocker}
+              onDeleteBlocker={handleDeleteBlocker}
+              onArtifactCreate={handleArtifactCreateForTask}
             />
           )}
           {isMobile && selectedArtifact && drawerStack.length > 0 && drawerStack[drawerStack.length - 1]?.type === 'artifact' && (

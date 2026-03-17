@@ -18,7 +18,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/app/components/ui/dropdown-menu';
-import { Trash2, Timer, MessageSquarePlus } from 'lucide-react';
+import { Trash2, Timer, MessageSquarePlus, Lock } from 'lucide-react';
 
 const TIMER_STORAGE_KEY = 'hierarch-timer-state';
 
@@ -175,6 +175,9 @@ export function TaskRow({
               </DropdownMenuContent>
             </DropdownMenu>
           </div>
+          {(task.blockers ?? []).some(b => !b.resolvedAt) && (
+            <Lock className="h-3 w-3 shrink-0 text-destructive/50" />
+          )}
           <TitleCell
             title={task.title}
             onChange={(title) => onUpdate(task.id, { title })}

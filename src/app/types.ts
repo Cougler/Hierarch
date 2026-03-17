@@ -8,6 +8,19 @@ export interface PhaseTransition {
   notes?: string;
 }
 
+export type BlockerType = 'person' | 'team' | 'external' | 'task';
+
+export interface Blocker {
+  id: string;
+  taskId: string;
+  type: BlockerType;
+  title: string;
+  owner?: string;
+  linkedTaskId?: string;
+  createdAt: string;
+  resolvedAt?: string;
+}
+
 export interface Task {
   id: string;
   title: string;
@@ -18,9 +31,8 @@ export interface Task {
   assignees: string[];
   order: number;
   project?: string;
-  waitingFor?: WaitingForItem[];
+  blockers?: Blocker[];
   phaseHistory?: PhaseTransition[];
-  blocker?: string;
   decisionNeeded?: boolean;
   decisionDetails?: string;
   dependency?: string;
@@ -28,6 +40,7 @@ export interface Task {
   createdAt?: string;
 }
 
+/** @deprecated Use Blocker instead */
 export interface WaitingForItem {
   id: string;
   title: string;
@@ -102,18 +115,22 @@ export interface TimeEntry {
 
 export const DEFAULT_STATUSES: StatusConfig[] = [
   { id: 'explore', title: 'Explore', color: 'bg-violet-500', countColor: 'text-violet-400', order: 0, width: 280, visible: true },
-  { id: 'define', title: 'Define', color: 'bg-blue-500', countColor: 'text-blue-400', order: 1, width: 280, visible: true },
-  { id: 'refine', title: 'Refine', color: 'bg-amber-500', countColor: 'text-amber-400', order: 2, width: 280, visible: true },
-  { id: 'feedback', title: 'Feedback', color: 'bg-orange-500', countColor: 'text-orange-400', order: 3, width: 280, visible: true, isFeedback: true },
+  { id: 'design', title: 'Design', color: 'bg-blue-500', countColor: 'text-blue-400', order: 1, width: 280, visible: true },
+  { id: 'iterate', title: 'Iterate', color: 'bg-amber-500', countColor: 'text-amber-400', order: 2, width: 280, visible: true },
+  { id: 'review', title: 'Review', color: 'bg-orange-500', countColor: 'text-orange-400', order: 3, width: 280, visible: true, isFeedback: true },
   { id: 'handoff', title: 'Handoff', color: 'bg-emerald-500', countColor: 'text-emerald-400', order: 4, width: 280, visible: true, isDone: true },
 ];
 
 // Maps old engineering statuses to design phases for migration
 export const LEGACY_STATUS_MAP: Record<string, string> = {
   'backlog': 'explore',
-  'in-progress': 'refine',
-  'review': 'feedback',
+  'in-progress': 'iterate',
+  'review': 'review',
   'done': 'handoff',
+  // Map old phase IDs to new ones
+  'define': 'design',
+  'refine': 'iterate',
+  'feedback': 'review',
 };
 
 export type Attachment = Resource; // backward compat alias

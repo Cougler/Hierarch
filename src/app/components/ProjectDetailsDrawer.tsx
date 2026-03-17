@@ -87,8 +87,7 @@ export function ProjectDetailsDrawer({
             whileHover={{ opacity: 1 }}
             transition={{ delay: 0.25, type: 'spring', stiffness: 320, damping: 28 }}
             onClick={() => onOpenChange(false)}
-            style={{ backgroundColor: '#1c1c1a' }}
-            className="fixed top-8 right-[460px] z-50 flex h-[60px] w-8 items-center justify-center rounded-full text-muted-foreground shadow-lg border border-white/[0.08] hover:text-foreground transition-colors"
+            className="fixed top-8 right-[460px] z-50 flex h-[60px] w-8 items-center justify-center rounded-full bg-drawer text-muted-foreground shadow-lg border border-border hover:text-foreground transition-colors"
           >
             <X className="h-3.5 w-3.5" />
           </motion.button>
@@ -100,8 +99,8 @@ export function ProjectDetailsDrawer({
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 0.88 }}
             transition={{ type: 'spring', stiffness: 420, damping: 32, mass: 0.7 }}
-            style={{ backgroundColor: '#1c1c1a', transformOrigin: 'top right' }}
-            className="fixed top-8 right-8 bottom-8 z-50 w-[420px] rounded-2xl shadow-2xl border border-white/[0.08] flex flex-col overflow-hidden"
+            style={{ transformOrigin: 'top right' }}
+            className="fixed top-8 right-8 bottom-8 z-50 w-[420px] rounded-2xl bg-drawer shadow-2xl border border-border flex flex-col overflow-hidden"
           >
             <div className="flex flex-col gap-5 p-5 overflow-auto flex-1">
               <h3 className="text-sm font-semibold text-foreground">Project details</h3>
@@ -116,7 +115,7 @@ export function ProjectDetailsDrawer({
                   onChange={e => setDescription(e.target.value)}
                   onBlur={handleDescriptionBlur}
                   placeholder="What is this project about?"
-                  className="min-h-[100px] resize-none bg-white/[0.04] border-white/[0.08] text-sm placeholder:text-muted-foreground/50 focus-visible:ring-white/20"
+                  className="min-h-[100px] resize-none bg-surface border-border text-sm placeholder:text-muted-foreground/50 focus-visible:ring-ring/30"
                 />
               </div>
 
@@ -134,7 +133,7 @@ export function ProjectDetailsDrawer({
                       <PopoverTrigger asChild>
                         <button className={cn(
                           'flex w-full items-center gap-2 rounded-lg border px-3 py-2 text-sm transition-colors',
-                          'border-white/[0.08] bg-white/[0.04] hover:bg-white/[0.06]',
+                          'border-border bg-surface hover:bg-surface',
                           startDate ? 'text-foreground' : 'text-muted-foreground/40',
                         )}>
                           {parsedStart ? format(parsedStart, 'MMM d, yyyy') : 'Start date'}
@@ -169,7 +168,7 @@ export function ProjectDetailsDrawer({
                       <PopoverTrigger asChild>
                         <button className={cn(
                           'flex w-full items-center gap-2 rounded-lg border px-3 py-2 text-sm transition-colors',
-                          'border-white/[0.08] bg-white/[0.04] hover:bg-white/[0.06]',
+                          'border-border bg-surface hover:bg-surface',
                           endDate ? 'text-foreground' : 'text-muted-foreground/40',
                         )}>
                           {parsedEnd ? format(parsedEnd, 'MMM d, yyyy') : 'End date'}

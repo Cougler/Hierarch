@@ -359,3 +359,47 @@ The Integrations page is live with Linear, Jira, Slack, and Figma cards. Linear 
 - Continue DataTable refactor
 
 ---
+
+## 2026-03-17 — Light mode theming, blockers system, phase rename, artifact enhancements
+
+Light mode is fully themed with dynamic CSS variable tokens (shell, drawer, surface, attention) replacing all hardcoded dark-only colors. Phases renamed from Explore/Define/Refine/Feedback/Handoff to Explore/Design/Iterate/Review/Handoff with full DB migration support via LEGACY_STATUS_MAP. Blockers are now a first-class entity (task_blockers Supabase table with RLS) replacing the old waitingFor JSON blob, with full CRUD, dashboard integration, and lock icons on blocked tasks.
+
+**Done this session:**
+- Built complete light mode theme system: extracted colors from reference screenshot, created `--shell`, `--shell-border`, `--drawer`, `--surface`, `--surface-hover`, `--attention` CSS variable tokens
+- Replaced all hardcoded `#262624` and `#1c1c1a` inline styles across 14+ files with theme-aware Tailwind classes (`bg-shell`, `bg-drawer`, `bg-surface`, etc.)
+- Replaced all `border-white/[0.06-0.08]`, `bg-white/[0.02-0.08]`, `hover:bg-white/[0.04-0.12]` with semantic tokens
+- Added `@custom-variant dark` for class-based dark mode support in Tailwind v4
+- Updated all accent text colors (artifact types, phase colors) from `-400` to `-700` light / `dark:-400` for WCAG accessibility
+- Linear SVG logo: added `invert-on-light` CSS class for dark appearance in light mode
+- Logo opacity changed from 50% to 100%
+- Created `task_blockers` Supabase table with RLS, replacing `waitingFor` JSON blob in task descriptions
+- Built full blocker CRUD: `getBlockersForUser`, `createBlocker`, `resolveBlocker`, `unresolveBlocker`, `deleteBlocker`
+- New `Blocker` type with `type` (person/team/external/task), `title`, `owner`, `linkedTaskId`, `createdAt`, `resolvedAt`
+- TaskDetailsDrawer: blocker section with type icons, age display, resolve/unresolve, collapsible resolved section
+- NewTaskDrawer: inline blocker creation with type picker
+- Lock icon on TaskCard (kanban) and TaskRow (list) for blocked tasks
+- Dashboard: blocked tasks surface in "Needs Attention" with highest priority, stale blocker detection (>3 days)
+- One-time migration from legacy waitingFor items to task_blockers table
+- Renamed phases: Define→Design, Refine→Iterate, Feedback→Review across all files (types, demo data, UI, onboarding)
+- Added LEGACY_STATUS_MAP entries for old→new phase ID migration on DB read
+- Fixed critical import bug: `LEGACY_STATUS_MAP` was inside `import type` (stripped at runtime)
+- Renamed artifact type "Freeform" to "Quick Note"
+- Added URL fields with previews for link, video, prototype, screenshot, figma artifact types
+- Video embeds for YouTube, Vimeo, Loom with iframe preview
+- Image preview for screenshot URLs, favicon cards for link/prototype
+- Domain-aware link labels (e.g., "YouTube Video", "Loom Recording", "Figma File")
+- Inline link detection in rich text editor: detects typed URLs and offers Badge (inline pill) or Card (block preview) conversion
+- Link badge: favicon + label with close button; link card: favicon + hostname + URL with external link icon
+- CSS styles for `.hierarch-link-badge` and `.hierarch-link-card` using theme CSS variables
+- Added "New Artifact" to sidebar create menu
+- Added "Add artifact" button to task drawer artifacts section (creates artifact linked to task)
+- Content area max-width constraint on editor to prevent URL overflow
+
+**Up next:**
+- Deploy latest changes to Vercel
+- Fix any remaining light mode contrast issues
+- Build Insights view for phase analytics
+- Linear OAuth flow
+- Continue DataTable refactor
+
+---

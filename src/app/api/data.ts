@@ -1,6 +1,8 @@
 import { supabase } from '../supabase-client';
 import type {
   Task,
+  Blocker,
+  BlockerType,
   WaitingForItem,
   PhaseTransition,
   Resource,
@@ -8,21 +10,22 @@ import type {
   Project,
   ProjectMetadata,
 } from '../types';
+import { LEGACY_STATUS_MAP } from '../types';
 
 const isValidUUID = (id: string) =>
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
 
-function parseTaskDescription(raw: string | null): { content: string; waitingFor: WaitingForItem[]; phaseHistory: PhaseTransition[] } {
-  if (!raw) return { content: '', waitingFor: [], phaseHistory: [] };
+function parseTaskDescription(raw: string | null): { content: string; phaseHistory: PhaseTransition[]; legacyWaitingFor: WaitingForItem[] } {
+  if (!raw) return { content: '', phaseHistory: [], legacyWaitingFor: [] };
   try {
     const parsed = JSON.parse(raw) as { content?: string; waitingFor?: WaitingForItem[]; phaseHistory?: PhaseTransition[] };
     return {
       content: parsed.content ?? '',
-      waitingFor: Array.isArray(parsed.waitingFor) ? parsed.waitingFor : [],
       phaseHistory: Array.isArray(parsed.phaseHistory) ? parsed.phaseHistory : [],
+      legacyWaitingFor: Array.isArray(parsed.waitingFor) ? parsed.waitingFor : [],
     };
   } catch {
-    return { content: raw, waitingFor: [], phaseHistory: [] };
+    return { content: raw, phaseHistory: [], legacyWaitingFor: [] };
   }
 }
 
@@ -144,25 +147,36 @@ export async function deleteProject(id: string): Promise<boolean> {
 }
 
 function mapDbTaskToTask(row: Record<string, unknown>): Task {
-  const { content, waitingFor, phaseHistory } = parseTaskDescription(row.description as string | null);
+  const { content, phaseHistory } = parseTaskDescription(row.description as string | null);
   return {
     id: row.id as string,
     title: (row.title as string) ?? '',
     description: content,
-    status: ((row.status as string) ?? 'explore').toLowerCase(),
+    status: LEGACY_STATUS_MAP[((row.status as string) ?? 'explore').toLowerCase()] ?? ((row.status as string) ?? 'explore').toLowerCase(),
     tags: Array.isArray(row.tags) ? (row.tags as string[]) : [],
     dueDate: (row.due_at as string) ?? '',
     assignees: Array.isArray(row.assignees) ? (row.assignees as string[]) : [],
     order: typeof row.position === 'number' ? row.position : 0,
     project: row.project_id as string | undefined,
-    waitingFor: waitingFor.length > 0 ? waitingFor : undefined,
     phaseHistory: phaseHistory.length > 0 ? phaseHistory : undefined,
-    blocker: row.blocker as string | undefined,
     decisionNeeded: row.decision_needed as boolean | undefined,
     decisionDetails: row.decision_details as string | undefined,
     dependency: row.dependency as string | undefined,
     artifact: row.artifact as string | undefined,
     createdAt: (row.created_at as string) ?? undefined,
+  };
+}
+
+function mapDbBlockerToBlocker(row: Record<string, unknown>): Blocker {
+  return {
+    id: row.id as string,
+    taskId: row.task_id as string,
+    type: (row.type as BlockerType) ?? 'person',
+    title: (row.title as string) ?? '',
+    owner: row.owner as string | undefined,
+    linkedTaskId: row.linked_task_id as string | undefined,
+    createdAt: (row.created_at as string) ?? '',
+    resolvedAt: row.resolved_at as string | undefined,
   };
 }
 
@@ -179,7 +193,12 @@ export async function getTasks(projectId?: string | null): Promise<Task[] | null
       console.error('getTasks error:', error);
       return null;
     }
-    return (data ?? []).map(mapDbTaskToTask);
+    try {
+      return (data ?? []).map(mapDbTaskToTask);
+    } catch (mapErr) {
+      console.error('getTasks mapping error:', mapErr);
+      return null;
+    }
   } catch (err) {
     console.error('getTasks error:', err);
     return null;
@@ -194,7 +213,6 @@ export async function createTask(
     const ownerId = await getOwnerId();
     const descriptionJson = JSON.stringify({
       content: task.description ?? '',
-      waitingFor: task.waitingFor ?? [],
       phaseHistory: task.phaseHistory ?? [],
     });
     const insert: Record<string, unknown> = {
@@ -206,7 +224,6 @@ export async function createTask(
       assignees: task.assignees ?? [],
       position: task.order ?? 0,
       project_id: projectId ?? task.project ?? null,
-      blocker: task.blocker ?? null,
       decision_needed: task.decisionNeeded ?? false,
       decision_details: task.decisionDetails ?? null,
       dependency: task.dependency ?? null,
@@ -215,7 +232,7 @@ export async function createTask(
     };
     const { data, error } = await supabase.from('tasks').insert(insert).select().single();
     if (error) {
-      console.error('createTask error:', error);
+      console.error('createTask error:', error, 'insert payload:', insert);
       return null;
     }
     return mapDbTaskToTask(data as Record<string, unknown>);
@@ -243,13 +260,11 @@ export async function updateTask(
       console.error('updateTask fetch error:', fetchError);
       return null;
     }
-    const { content, waitingFor, phaseHistory } = parseTaskDescription(current.description as string | null);
+    const { content, phaseHistory } = parseTaskDescription(current.description as string | null);
     const mergedContent = updates.description !== undefined ? updates.description : content;
-    const mergedWaitingFor = updates.waitingFor ?? waitingFor;
     const mergedPhaseHistory = updates.phaseHistory ?? phaseHistory;
     const descriptionJson = JSON.stringify({
       content: mergedContent,
-      waitingFor: mergedWaitingFor,
       phaseHistory: mergedPhaseHistory,
     });
     const dbUpdates: Record<string, unknown> = {};
@@ -260,7 +275,6 @@ export async function updateTask(
     if (updates.assignees !== undefined) dbUpdates.assignees = updates.assignees;
     if (updates.order !== undefined) dbUpdates.position = updates.order;
     if (updates.project !== undefined) dbUpdates.project_id = updates.project;
-    if (updates.blocker !== undefined) dbUpdates.blocker = updates.blocker;
     if (updates.decisionNeeded !== undefined) dbUpdates.decision_needed = updates.decisionNeeded;
     if (updates.decisionDetails !== undefined) dbUpdates.decision_details = updates.decisionDetails;
     if (updates.dependency !== undefined) dbUpdates.dependency = updates.dependency;
@@ -439,5 +453,150 @@ export async function deleteResource(id: string): Promise<boolean> {
   } catch (err) {
     console.error('deleteResource error:', err);
     return false;
+  }
+}
+
+// ─── Blockers ───────────────────────────────────────────────────────
+
+export async function getBlockersForUser(): Promise<Blocker[]> {
+  try {
+    const { data, error } = await supabase
+      .from('task_blockers')
+      .select('*')
+      .order('created_at', { ascending: true });
+    if (error) {
+      console.error('getBlockersForUser error:', error);
+      return [];
+    }
+    return (data ?? []).map(mapDbBlockerToBlocker);
+  } catch (err) {
+    console.error('getBlockersForUser error:', err);
+    return [];
+  }
+}
+
+export async function createBlocker(
+  taskId: string,
+  blocker: { type: BlockerType; title: string; owner?: string; linkedTaskId?: string }
+): Promise<Blocker | null> {
+  try {
+    const ownerId = await getOwnerId();
+    if (!ownerId) return null;
+    const { data, error } = await supabase
+      .from('task_blockers')
+      .insert({
+        task_id: taskId,
+        user_id: ownerId,
+        type: blocker.type,
+        title: blocker.title,
+        owner: blocker.owner ?? null,
+        linked_task_id: blocker.linkedTaskId ?? null,
+      })
+      .select()
+      .single();
+    if (error) {
+      console.error('createBlocker error:', error);
+      return null;
+    }
+    return mapDbBlockerToBlocker(data as Record<string, unknown>);
+  } catch (err) {
+    console.error('createBlocker error:', err);
+    return null;
+  }
+}
+
+export async function resolveBlocker(id: string): Promise<Blocker | null> {
+  try {
+    const { data, error } = await supabase
+      .from('task_blockers')
+      .update({ resolved_at: new Date().toISOString() })
+      .eq('id', id)
+      .select()
+      .single();
+    if (error) {
+      console.error('resolveBlocker error:', error);
+      return null;
+    }
+    return mapDbBlockerToBlocker(data as Record<string, unknown>);
+  } catch (err) {
+    console.error('resolveBlocker error:', err);
+    return null;
+  }
+}
+
+export async function unresolveBlocker(id: string): Promise<Blocker | null> {
+  try {
+    const { data, error } = await supabase
+      .from('task_blockers')
+      .update({ resolved_at: null })
+      .eq('id', id)
+      .select()
+      .single();
+    if (error) {
+      console.error('unresolveBlocker error:', error);
+      return null;
+    }
+    return mapDbBlockerToBlocker(data as Record<string, unknown>);
+  } catch (err) {
+    console.error('unresolveBlocker error:', err);
+    return null;
+  }
+}
+
+export async function deleteBlocker(id: string): Promise<boolean> {
+  try {
+    const { error } = await supabase.from('task_blockers').delete().eq('id', id);
+    if (error) {
+      console.error('deleteBlocker error:', error);
+      return false;
+    }
+    return true;
+  } catch (err) {
+    console.error('deleteBlocker error:', err);
+    return false;
+  }
+}
+
+/** Migrate legacy waitingFor items from description JSON to task_blockers table */
+export async function migrateWaitingForToBlockers(): Promise<void> {
+  if (localStorage.getItem('hierarch-blockers-migrated')) return;
+  try {
+    const ownerId = await getOwnerId();
+    if (!ownerId) return;
+
+    const { data: tasks, error } = await supabase.from('tasks').select('id, description');
+    if (error || !tasks) return;
+
+    for (const row of tasks) {
+      const { legacyWaitingFor } = parseTaskDescription(row.description as string | null);
+      if (legacyWaitingFor.length === 0) continue;
+
+      // Check if blockers already exist for this task (idempotent)
+      const { data: existing } = await supabase
+        .from('task_blockers')
+        .select('id')
+        .eq('task_id', row.id)
+        .limit(1);
+      if (existing && existing.length > 0) continue;
+
+      // Create blockers from waiting-for items
+      const blockerInserts = legacyWaitingFor.map(wf => ({
+        task_id: row.id,
+        user_id: ownerId,
+        type: 'person' as const,
+        title: wf.title,
+        resolved_at: wf.completed ? new Date().toISOString() : null,
+      }));
+      await supabase.from('task_blockers').insert(blockerInserts);
+
+      // Rewrite description without waitingFor
+      const parsed = JSON.parse(row.description as string);
+      delete parsed.waitingFor;
+      await supabase.from('tasks').update({ description: JSON.stringify(parsed) }).eq('id', row.id);
+    }
+
+    localStorage.setItem('hierarch-blockers-migrated', '1');
+  } catch (err) {
+    console.error('migrateWaitingForToBlockers error:', err);
   }
 }

@@ -2,6 +2,8 @@
 @import "tailwindcss";
 @import "./theme.css";
 
+@custom-variant dark (&:where(.dark, .dark *));
+
 @layer base {
   * {
     @apply border-border;
@@ -31,4 +33,112 @@
   .dark ::selection {
     background-color: rgb(205 138 58 / 0.30);
   }
+
+  /* Invert white logos in light mode */
+  .light .invert-on-light {
+    filter: invert(1);
+  }
+}
+
+/* ─── Link badge (inline) ─── */
+.hierarch-link-badge-wrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 0;
+  vertical-align: baseline;
+  position: relative;
+}
+.hierarch-link-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 1px 8px 1px 6px;
+  border-radius: 9999px 0 0 9999px;
+  background: var(--accent);
+  border: 1px solid var(--border);
+  border-right: none;
+  color: var(--foreground);
+  font-size: 12px;
+  font-weight: 500;
+  text-decoration: none !important;
+  vertical-align: baseline;
+  line-height: 1.6;
+  transition: background 0.15s;
+}
+.hierarch-link-badge:hover {
+  background: var(--surface-hover);
+}
+.hierarch-link-badge-close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  padding: 1px 0;
+  border-radius: 0 9999px 9999px 0;
+  background: var(--accent);
+  border: 1px solid var(--border);
+  border-left: none;
+  color: var(--muted-foreground);
+  font-size: 13px;
+  line-height: 1.6;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+.hierarch-link-badge-close:hover {
+  background: var(--destructive);
+  color: white;
+}
+
+/* ─── Link card (block) ─── */
+.hierarch-link-card {
+  display: block;
+  margin: 8px 0;
+  text-decoration: none !important;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: var(--accent);
+  overflow: hidden;
+  transition: border-color 0.15s;
+}
+.hierarch-link-card:hover {
+  border-color: var(--ring);
+}
+.hierarch-link-card-inner {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+}
+.hierarch-link-card-inner img {
+  width: 20px;
+  height: 20px;
+  border-radius: 4px;
+  flex-shrink: 0;
+}
+.hierarch-link-card-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.hierarch-link-card-host {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--foreground);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.hierarch-link-card-url {
+  font-size: 10px;
+  color: var(--muted-foreground);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.hierarch-link-card-inner svg {
+  flex-shrink: 0;
+  color: var(--muted-foreground);
+  opacity: 0.4;
 }

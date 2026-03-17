@@ -54,7 +54,7 @@ export function IntegrationsPage({ onViewChange }: IntegrationsPageProps) {
       id: 'linear',
       name: 'Linear',
       description: 'Sync issues and track design work alongside your team.',
-      icon: <img src="/linear.svg" alt="Linear" className="h-4 w-4" />,
+      icon: <img src="/linear.svg" alt="Linear" className="h-4 w-4 invert-on-light" />,
       connected: hasLinear,
       onClick: () => hasLinear ? onViewChange('linear') : setConnectDrawer('linear'),
     },
@@ -112,13 +112,13 @@ export function IntegrationsPage({ onViewChange }: IntegrationsPageProps) {
                 integration.connected
                   ? 'border-primary/30 bg-primary/[0.04] hover:bg-primary/[0.08] cursor-pointer'
                   : 'comingSoon' in integration && integration.comingSoon
-                    ? 'border-white/[0.06] bg-white/[0.01] opacity-60 cursor-default'
-                    : 'border-white/[0.08] bg-white/[0.02] hover:bg-white/[0.04] cursor-pointer',
+                    ? 'border-border bg-muted/50 opacity-60 cursor-default'
+                    : 'border-border bg-accent/30 hover:bg-accent/50 cursor-pointer',
               )}
             >
               <div className={cn(
                 'flex h-10 w-10 shrink-0 items-center justify-center rounded-lg',
-                integration.connected ? 'bg-primary/15 text-primary' : 'bg-white/[0.06] text-muted-foreground',
+                integration.connected ? 'bg-primary/15 text-primary' : 'bg-accent text-muted-foreground',
               )}>
                 {integration.icon}
               </div>
@@ -131,7 +131,7 @@ export function IntegrationsPage({ onViewChange }: IntegrationsPageProps) {
                     </span>
                   )}
                   {'comingSoon' in integration && integration.comingSoon && (
-                    <span className="rounded-full bg-white/[0.06] px-2 py-0.5 text-[10px] font-medium text-muted-foreground/60">
+                    <span className="rounded-full bg-accent px-2 py-0.5 text-[10px] font-medium text-muted-foreground/60">
                       Coming soon
                     </span>
                   )}
@@ -158,8 +158,7 @@ export function IntegrationsPage({ onViewChange }: IntegrationsPageProps) {
               whileHover={{ opacity: 1 }}
               transition={{ delay: 0.25, type: 'spring', stiffness: 320, damping: 28 }}
               onClick={closeDrawer}
-              style={{ backgroundColor: '#1c1c1a' }}
-              className="fixed top-8 right-[460px] z-50 flex h-[60px] w-8 items-center justify-center rounded-full text-muted-foreground shadow-lg border border-white/[0.08] hover:text-foreground transition-colors"
+              className="fixed top-8 right-[460px] z-50 flex h-[60px] w-8 items-center justify-center rounded-full bg-card text-muted-foreground shadow-lg border border-border hover:text-foreground transition-colors"
             >
               <X className="h-3.5 w-3.5" />
             </motion.button>
@@ -171,14 +170,14 @@ export function IntegrationsPage({ onViewChange }: IntegrationsPageProps) {
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.88 }}
               transition={{ type: 'spring', stiffness: 420, damping: 32, mass: 0.7 }}
-              style={{ backgroundColor: '#1c1c1a', transformOrigin: 'top right' }}
-              className="fixed top-8 right-8 bottom-8 z-50 w-[420px] rounded-2xl shadow-2xl border border-white/[0.08] overflow-hidden flex flex-col"
+              style={{ transformOrigin: 'top right' }}
+              className="fixed top-8 right-8 bottom-8 z-50 w-[420px] rounded-2xl bg-card shadow-2xl border border-border overflow-hidden flex flex-col"
             >
               {/* Header */}
-              <div className="shrink-0 px-5 pt-5 pb-4 border-b border-white/[0.06]">
+              <div className="shrink-0 px-5 pt-5 pb-4 border-b border-border">
                 <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-white/[0.06] flex items-center justify-center">
-                    <img src="/linear.svg" alt="Linear" className="h-5 w-5" />
+                  <div className="w-10 h-10 rounded-xl bg-accent flex items-center justify-center">
+                    <img src="/linear.svg" alt="Linear" className="h-5 w-5 invert-on-light" />
                   </div>
                   <div>
                     <h3 className="text-sm font-semibold text-foreground">Connect to Linear</h3>
@@ -202,7 +201,7 @@ export function IntegrationsPage({ onViewChange }: IntegrationsPageProps) {
                     value={token}
                     onChange={e => setToken(e.target.value)}
                     onKeyDown={e => e.key === 'Enter' && handleLinearConnect()}
-                    className="font-mono text-sm bg-white/[0.04] border-white/[0.08] placeholder:text-muted-foreground/50 focus-visible:ring-white/20"
+                    className="font-mono text-sm bg-surface border-border placeholder:text-muted-foreground/50 focus-visible:ring-ring/30"
                   />
                   <p className="text-[11px] text-muted-foreground/50 mt-2">
                     Get it at <span className="font-mono text-[#5E6AD2]">linear.app &rarr; Settings &rarr; API &rarr; Personal API keys</span>

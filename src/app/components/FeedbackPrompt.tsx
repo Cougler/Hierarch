@@ -40,9 +40,9 @@ export function FeedbackPrompt({ open, onConfirm, onSkip }: FeedbackPromptProps)
               <MessageSquare className="h-4 w-4 text-orange-400" />
             </div>
             <div>
-              <DialogTitle className="text-base">Requesting Feedback</DialogTitle>
+              <DialogTitle className="text-base">Requesting Review</DialogTitle>
               <DialogDescription className="text-xs">
-                Who's giving feedback on this work?
+                Who's reviewing this work?
               </DialogDescription>
             </div>
           </div>

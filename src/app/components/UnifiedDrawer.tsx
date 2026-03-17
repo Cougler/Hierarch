@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '@/app/lib/utils';
 import { ArrowLeft, ChevronRight, X } from 'lucide-react';
 import { useIsMobile } from '@/app/hooks/use-mobile';
-import type { Task, StatusConfig, Project } from '@/app/types';
+import type { Task, StatusConfig, Project, BlockerType } from '@/app/types';
 import type { Artifact } from '@/app/components/NoteDrawer';
 
 import { TaskDetailsDrawer } from './TaskDetailsDrawer';
@@ -41,6 +41,10 @@ interface UnifiedDrawerProps {
   onArtifactDelete: (id: string) => void;
   onArtifactCreate: (projectId: string) => void;
   onViewChange: (view: string) => void;
+  onCreateBlocker?: (taskId: string, blocker: { type: BlockerType; title: string; owner?: string }) => void;
+  onResolveBlocker?: (taskId: string, blockerId: string, unresolve?: boolean) => void;
+  onDeleteBlocker?: (taskId: string, blockerId: string) => void;
+  onArtifactCreateForTask?: (taskId: string) => void;
 }
 
 // ─── Breadcrumb label helpers ───────────────────────────────────────────────
@@ -99,6 +103,10 @@ export function UnifiedDrawer({
   onArtifactDelete,
   onArtifactCreate,
   onViewChange,
+  onCreateBlocker,
+  onResolveBlocker,
+  onDeleteBlocker,
+  onArtifactCreateForTask,
 }: UnifiedDrawerProps) {
   const isMobile = useIsMobile();
   const isOpen = stack.length > 0;
@@ -148,6 +156,10 @@ export function UnifiedDrawer({
           onUpdate={onTaskUpdate}
           onDelete={(id) => { onTaskDelete(id); onClose(); }}
           onArtifactClick={onPushArtifact}
+          onCreateBlocker={onCreateBlocker}
+          onResolveBlocker={onResolveBlocker}
+          onDeleteBlocker={onDeleteBlocker}
+          onArtifactCreate={onArtifactCreateForTask}
           embedded
         />
       );
@@ -189,8 +201,7 @@ export function UnifiedDrawer({
             whileHover={{ opacity: 1 }}
             transition={{ delay: 0.25, type: 'spring', stiffness: 320, damping: 28 }}
             onClick={onClose}
-            style={{ backgroundColor: '#1c1c1a' }}
-            className="fixed top-8 right-[460px] z-50 flex h-[60px] w-8 items-center justify-center rounded-full text-muted-foreground shadow-lg border border-white/[0.08] hover:text-foreground transition-colors"
+            className="fixed top-8 right-[460px] z-50 flex h-[60px] w-8 items-center justify-center rounded-full bg-drawer text-muted-foreground shadow-lg border border-border hover:text-foreground transition-colors"
           >
             <X className="h-3.5 w-3.5" />
           </motion.button>
@@ -202,8 +213,8 @@ export function UnifiedDrawer({
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 0.88 }}
             transition={{ type: 'spring', stiffness: 420, damping: 32, mass: 0.7 }}
-            style={{ backgroundColor: '#1c1c1a', transformOrigin: 'top right' }}
-            className="fixed top-8 right-8 bottom-8 z-50 w-[420px] rounded-2xl shadow-2xl border border-white/[0.08] overflow-hidden flex flex-col"
+            style={{ transformOrigin: 'top right' }}
+            className="fixed top-8 right-8 bottom-8 z-50 w-[420px] rounded-2xl bg-drawer shadow-2xl border border-border overflow-hidden flex flex-col"
           >
             {/* Navigation bar */}
             <div className="shrink-0 flex items-center gap-2 px-4 pt-4 pb-2">
@@ -211,7 +222,7 @@ export function UnifiedDrawer({
               {canGoBack && (
                 <button
                   onClick={onBack}
-                  className="flex h-7 w-7 items-center justify-center rounded-lg text-muted-foreground/50 hover:text-foreground hover:bg-white/[0.06] transition-colors"
+                  className="flex h-7 w-7 items-center justify-center rounded-lg text-muted-foreground/50 hover:text-foreground hover:bg-surface transition-colors"
                 >
                   <ArrowLeft className="h-4 w-4" />
                 </button>

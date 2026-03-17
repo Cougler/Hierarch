@@ -474,7 +474,7 @@ export function DataTable<T>({
                   {col.resizable !== false && (
                     <div
                       onMouseDown={onResizeStart(col.id, widths[col.id] ?? col.defaultWidth, getMaxWidth(col.id))}
-                      className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-white/20 rounded"
+                      className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-border rounded"
                     />
                   )}
                 </div>

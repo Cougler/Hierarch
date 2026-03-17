@@ -23,7 +23,8 @@ import {
 import { Calendar } from '@/app/components/ui/calendar';
 import { format, parseISO, isToday, isPast } from 'date-fns';
 import { useIsMobile } from '@/app/hooks/use-mobile';
-import type { Task, StatusConfig, Project, WaitingForItem } from '@/app/types';
+import type { Task, StatusConfig, Project, Blocker, BlockerType } from '@/app/types';
+import { User, Users, Globe, Link2, Lock, RotateCcw } from 'lucide-react';
 import type { Artifact } from '@/app/components/NoteDrawer';
 import { getIconComponent } from '@/app/components/IconPicker';
 import { PhaseJourney } from '@/app/components/PhaseJourney';
@@ -33,11 +34,11 @@ import { ARTIFACT_TYPE_ICONS, ARTIFACT_TYPE_COLORS } from '@/app/components/Arti
 // ─── Phase color helpers ─────────────────────────────────────────────────────
 
 const PHASE_COLORS: Record<string, { color: string; bg: string }> = {
-  explore: { color: 'text-violet-400', bg: 'bg-violet-400/10' },
-  define: { color: 'text-blue-400', bg: 'bg-blue-400/10' },
-  refine: { color: 'text-amber-400', bg: 'bg-amber-400/10' },
-  feedback: { color: 'text-orange-400', bg: 'bg-orange-400/10' },
-  handoff: { color: 'text-emerald-400', bg: 'bg-emerald-400/10' },
+  explore: { color: 'text-violet-700 dark:text-violet-400', bg: 'bg-violet-500/10' },
+  design: { color: 'text-blue-700 dark:text-blue-400', bg: 'bg-blue-500/10' },
+  iterate: { color: 'text-amber-700 dark:text-amber-400', bg: 'bg-amber-500/10' },
+  review: { color: 'text-orange-700 dark:text-orange-400', bg: 'bg-orange-500/10' },
+  handoff: { color: 'text-emerald-700 dark:text-emerald-400', bg: 'bg-emerald-500/10' },
 };
 
 const getPhaseStyle = (id: string) => PHASE_COLORS[id] ?? { color: 'text-muted-foreground', bg: 'bg-muted/20' };
@@ -119,6 +120,21 @@ function PickerPopover({
 
 // ─── Props ──────────────────────────────────────────────────────────────────
 
+const BLOCKER_TYPE_META: Record<BlockerType, { icon: typeof User; label: string }> = {
+  person: { icon: User, label: 'Person' },
+  team: { icon: Users, label: 'Team' },
+  external: { icon: Globe, label: 'External' },
+  task: { icon: Link2, label: 'Task' },
+};
+
+function blockerAge(createdAt: string): string {
+  const diff = Date.now() - new Date(createdAt).getTime();
+  const days = Math.floor(diff / 86400000);
+  if (days === 0) return 'today';
+  if (days === 1) return '1d';
+  return `${days}d`;
+}
+
 interface TaskDetailsDrawerProps {
   task: Task | null;
   open: boolean;
@@ -129,6 +145,10 @@ interface TaskDetailsDrawerProps {
   onUpdate: (id: string, updates: Partial<Task>) => void;
   onDelete: (id: string) => void;
   onArtifactClick: (artifact: Artifact) => void;
+  onCreateBlocker?: (taskId: string, blocker: { type: BlockerType; title: string; owner?: string }) => void;
+  onResolveBlocker?: (taskId: string, blockerId: string, unresolve?: boolean) => void;
+  onDeleteBlocker?: (taskId: string, blockerId: string) => void;
+  onArtifactCreate?: (taskId: string) => void;
   onBack?: () => void;
   embedded?: boolean;
 }
@@ -143,6 +163,10 @@ export function TaskDetailsDrawer({
   onUpdate,
   onDelete,
   onArtifactClick,
+  onCreateBlocker,
+  onResolveBlocker,
+  onDeleteBlocker,
+  onArtifactCreate,
   onBack,
   embedded,
 }: TaskDetailsDrawerProps) {
@@ -151,8 +175,11 @@ export function TaskDetailsDrawer({
   const [dateOpen, setDateOpen] = useState(false);
   const [phaseOpen, setPhaseOpen] = useState(false);
   const [projectOpen, setProjectOpen] = useState(false);
-  const [waitingInputVisible, setWaitingInputVisible] = useState(false);
-  const [newWaitingText, setNewWaitingText] = useState('');
+  const [blockerInputVisible, setBlockerInputVisible] = useState(false);
+  const [newBlockerTitle, setNewBlockerTitle] = useState('');
+  const [newBlockerType, setNewBlockerType] = useState<BlockerType>('person');
+  const [newBlockerOwner, setNewBlockerOwner] = useState('');
+  const [showResolved, setShowResolved] = useState(false);
   const titleRef = useRef<HTMLInputElement>(null);
 
   const update = useCallback(
@@ -165,32 +192,28 @@ export function TaskDetailsDrawer({
   useEffect(() => {
     if (!open) {
       setConfirmDelete(false);
-      setWaitingInputVisible(false);
-      setNewWaitingText('');
+      setBlockerInputVisible(false);
+      setNewBlockerTitle('');
+      setNewBlockerOwner('');
+      setShowResolved(false);
     }
   }, [open]);
 
-  const toggleWaitingItem = useCallback(
-    (itemId: string) => {
-      if (!task) return;
-      update({
-        waitingFor: (task.waitingFor ?? []).map(w =>
-          w.id === itemId ? { ...w, completed: !w.completed } : w,
-        ),
-      });
-    },
-    [task, update],
-  );
+  const activeBlockers = useMemo(() => (task?.blockers ?? []).filter(b => !b.resolvedAt), [task?.blockers]);
+  const resolvedBlockers = useMemo(() => (task?.blockers ?? []).filter(b => b.resolvedAt), [task?.blockers]);
 
-  const deleteWaitingItem = useCallback(
-    (itemId: string) => {
-      if (!task) return;
-      update({
-        waitingFor: (task.waitingFor ?? []).filter(w => w.id !== itemId),
-      });
-    },
-    [task, update],
-  );
+  const handleAddBlocker = useCallback(() => {
+    if (!task || !newBlockerTitle.trim() || !onCreateBlocker) return;
+    onCreateBlocker(task.id, {
+      type: newBlockerType,
+      title: newBlockerTitle.trim(),
+      owner: newBlockerOwner.trim() || undefined,
+    });
+    setNewBlockerTitle('');
+    setNewBlockerOwner('');
+    setNewBlockerType('person');
+    setBlockerInputVisible(false);
+  }, [task, newBlockerTitle, newBlockerType, newBlockerOwner, onCreateBlocker]);
 
   const handleDelete = useCallback(() => {
     if (!task) return;
@@ -267,7 +290,7 @@ export function TaskDetailsDrawer({
                           'flex items-center gap-2.5 rounded-lg px-3 py-2.5 text-xs transition-colors',
                           isActive
                             ? cn(style.bg, style.color, 'font-medium')
-                            : 'text-muted-foreground hover:bg-white/[0.06] hover:text-foreground',
+                            : 'text-muted-foreground hover:bg-surface hover:text-foreground',
                         )}
                       >
                         <span className={cn('h-2 w-2 rounded-full shrink-0', s.color)} />
@@ -293,7 +316,7 @@ export function TaskDetailsDrawer({
                     <button className={cn(
                       'flex flex-1 min-w-0 items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs transition-colors',
                       taskProject
-                        ? 'bg-white/[0.04] text-foreground hover:bg-white/[0.07]'
+                        ? 'bg-surface text-foreground hover:bg-surface-hover'
                         : 'border border-dashed border-border/40 text-muted-foreground/40 hover:text-muted-foreground hover:border-border/60',
                     )}>
                       <FolderKanban className="h-3 w-3 shrink-0" />
@@ -310,7 +333,7 @@ export function TaskDetailsDrawer({
                 {taskProject && (
                   <button
                     onClick={() => update({ project: undefined })}
-                    className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-muted-foreground/30 hover:text-muted-foreground hover:bg-white/[0.06] transition-colors"
+                    className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-muted-foreground/30 hover:text-muted-foreground hover:bg-surface transition-colors"
                   >
                     <X className="h-3 w-3" />
                   </button>
@@ -328,7 +351,7 @@ export function TaskDetailsDrawer({
                     className={cn(
                       'flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs transition-colors',
                       task.dueDate
-                        ? 'bg-white/[0.04] text-foreground hover:bg-white/[0.07]'
+                        ? 'bg-surface text-foreground hover:bg-surface-hover'
                         : 'border border-dashed border-border/40 text-muted-foreground/40 hover:text-muted-foreground hover:border-border/60',
                       overdue && 'text-red-400',
                       today && 'text-amber-400',
@@ -369,7 +392,7 @@ export function TaskDetailsDrawer({
                           update({ dueDate: e.target.value ? `${datePart}T${e.target.value}` : datePart });
                         }}
                         disabled={!task.dueDate}
-                        className="flex-1 h-7 rounded-md border border-border/40 bg-white/[0.04] px-2.5 text-xs text-foreground outline-none [color-scheme:dark] focus:border-primary/50 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                        className="flex-1 h-7 rounded-md border border-border/40 bg-surface px-2.5 text-xs text-foreground outline-none [color-scheme:auto] focus:border-primary/50 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
                       />
                       {timeValue && (
                         <button
@@ -377,7 +400,7 @@ export function TaskDetailsDrawer({
                             if (!parsed) return;
                             update({ dueDate: format(parsed, 'yyyy-MM-dd') });
                           }}
-                          className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-muted-foreground/40 hover:text-muted-foreground hover:bg-white/[0.06] transition-colors"
+                          className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-muted-foreground/40 hover:text-muted-foreground hover:bg-surface transition-colors"
                         >
                           <X className="h-3 w-3" />
                         </button>
@@ -402,7 +425,7 @@ export function TaskDetailsDrawer({
               {task.dueDate && (
                 <button
                   onClick={() => update({ dueDate: '' })}
-                  className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-muted-foreground/30 hover:text-muted-foreground hover:bg-white/[0.06] transition-colors"
+                  className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-muted-foreground/30 hover:text-muted-foreground hover:bg-surface transition-colors"
                 >
                   <X className="h-3 w-3" />
                 </button>
@@ -424,101 +447,159 @@ export function TaskDetailsDrawer({
             />
           </div>
 
-          {/* Waiting For */}
+          {/* Blockers */}
           <div className="space-y-2">
             <div className="flex items-center justify-between">
-              <Label className="text-[11px] text-muted-foreground/70">Waiting For</Label>
-              {(task.waitingFor ?? []).length > 0 && (
-                <span className="text-[10px] text-muted-foreground/40">
-                  {(task.waitingFor ?? []).filter(w => w.completed).length}/{(task.waitingFor ?? []).length} done
-                </span>
+              <div className="flex items-center gap-1.5">
+                <Label className="text-[11px] text-muted-foreground/70">Blockers</Label>
+                {activeBlockers.length > 0 && (
+                  <span className="flex h-4 min-w-4 items-center justify-center rounded-full bg-destructive/15 px-1 text-[9px] font-medium text-destructive">
+                    {activeBlockers.length}
+                  </span>
+                )}
+              </div>
+              {resolvedBlockers.length > 0 && (
+                <button
+                  onClick={() => setShowResolved(!showResolved)}
+                  className="text-[10px] text-muted-foreground/40 hover:text-muted-foreground transition-colors"
+                >
+                  {showResolved ? 'Hide' : 'Show'} resolved ({resolvedBlockers.length})
+                </button>
               )}
             </div>
-            <div className="overflow-hidden rounded-xl border border-white/[0.05] bg-muted/20">
+            <div className="overflow-hidden rounded-xl border border-border bg-muted/20">
               <AnimatePresence initial={false}>
-                {(task.waitingFor ?? []).map((item, i) => (
-                  <motion.div
-                    key={item.id}
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    exit={{ opacity: 0, height: 0, overflow: 'hidden' }}
-                    transition={{ duration: 0.12 }}
-                  >
-                    <div className={cn(
-                      'group flex items-center gap-2.5 px-3 py-2.5',
-                      i > 0 && 'border-t border-white/[0.04]',
-                    )}>
-                      <button
-                        onClick={() => toggleWaitingItem(item.id)}
-                        className={cn(
-                          'flex h-4 w-4 shrink-0 items-center justify-center rounded-full border transition-all',
-                          item.completed
-                            ? 'border-primary/50 bg-primary/20 text-primary'
-                            : 'border-white/20 text-transparent hover:border-white/40',
-                        )}
-                      >
-                        <Check className="h-2.5 w-2.5" />
-                      </button>
-                      <span className={cn(
-                        'flex-1 text-xs leading-relaxed',
-                        item.completed ? 'text-muted-foreground/40 line-through' : 'text-foreground/80',
+                {activeBlockers.map((blocker, i) => {
+                  const TypeIcon = BLOCKER_TYPE_META[blocker.type].icon;
+                  return (
+                    <motion.div
+                      key={blocker.id}
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      exit={{ opacity: 0, height: 0, overflow: 'hidden' }}
+                      transition={{ duration: 0.12 }}
+                    >
+                      <div className={cn(
+                        'group flex items-center gap-2.5 px-3 py-2.5',
+                        i > 0 && 'border-t border-border/50',
                       )}>
-                        {item.title}
-                      </span>
-                      <button
-                        onClick={() => deleteWaitingItem(item.id)}
-                        className="shrink-0 text-transparent transition-all group-hover:text-muted-foreground/40 hover:!text-destructive"
-                      >
-                        <X className="h-3 w-3" />
-                      </button>
-                    </div>
-                  </motion.div>
-                ))}
+                        <TypeIcon className="h-3.5 w-3.5 shrink-0 text-muted-foreground/50" />
+                        <div className="flex-1 min-w-0">
+                          <span className="text-xs text-foreground/80 leading-relaxed">{blocker.title}</span>
+                          {blocker.owner && (
+                            <span className="ml-1.5 text-[10px] text-muted-foreground/50">from {blocker.owner}</span>
+                          )}
+                        </div>
+                        <span className="shrink-0 text-[10px] text-muted-foreground/30">{blockerAge(blocker.createdAt)}</span>
+                        <button
+                          onClick={() => onResolveBlocker?.(task.id, blocker.id)}
+                          className="shrink-0 text-muted-foreground/30 transition-all hover:text-emerald-500"
+                          title="Resolve"
+                        >
+                          <Check className="h-3 w-3" />
+                        </button>
+                        <button
+                          onClick={() => onDeleteBlocker?.(task.id, blocker.id)}
+                          className="shrink-0 text-transparent transition-all group-hover:text-muted-foreground/30 hover:!text-destructive"
+                          title="Delete"
+                        >
+                          <X className="h-3 w-3" />
+                        </button>
+                      </div>
+                    </motion.div>
+                  );
+                })}
               </AnimatePresence>
-              {waitingInputVisible ? (
+
+              {/* Resolved blockers (collapsible) */}
+              <AnimatePresence>
+                {showResolved && resolvedBlockers.map((blocker, i) => {
+                  const TypeIcon = BLOCKER_TYPE_META[blocker.type].icon;
+                  return (
+                    <motion.div
+                      key={blocker.id}
+                      initial={{ opacity: 0, height: 0 }}
+                      animate={{ opacity: 1, height: 'auto' }}
+                      exit={{ opacity: 0, height: 0 }}
+                      transition={{ duration: 0.15 }}
+                    >
+                      <div className={cn(
+                        'group flex items-center gap-2.5 px-3 py-2',
+                        (i > 0 || activeBlockers.length > 0) && 'border-t border-border/50',
+                      )}>
+                        <TypeIcon className="h-3.5 w-3.5 shrink-0 text-muted-foreground/20" />
+                        <span className="flex-1 text-xs text-muted-foreground/40 line-through truncate">{blocker.title}</span>
+                        <button
+                          onClick={() => onResolveBlocker?.(task.id, blocker.id, true)}
+                          className="shrink-0 text-transparent transition-all group-hover:text-muted-foreground/30 hover:!text-foreground"
+                          title="Unresolve"
+                        >
+                          <RotateCcw className="h-3 w-3" />
+                        </button>
+                      </div>
+                    </motion.div>
+                  );
+                })}
+              </AnimatePresence>
+
+              {/* Add blocker */}
+              {blockerInputVisible ? (
                 <div className={cn(
-                  'flex items-center gap-2.5 px-3 py-2.5',
-                  (task.waitingFor ?? []).length > 0 && 'border-t border-white/[0.04]',
+                  'px-3 py-2.5 space-y-2',
+                  (activeBlockers.length > 0 || (showResolved && resolvedBlockers.length > 0)) && 'border-t border-border/50',
                 )}>
-                  <div className="h-4 w-4 shrink-0 rounded-full border border-white/10" />
+                  <div className="flex items-center gap-1">
+                    {(Object.keys(BLOCKER_TYPE_META) as BlockerType[]).map(t => {
+                      const Meta = BLOCKER_TYPE_META[t];
+                      return (
+                        <button
+                          key={t}
+                          onClick={() => setNewBlockerType(t)}
+                          className={cn(
+                            'flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium transition-colors border',
+                            newBlockerType === t
+                              ? 'border-primary/40 bg-primary/10 text-primary'
+                              : 'border-border text-muted-foreground/50 hover:text-foreground',
+                          )}
+                        >
+                          <Meta.icon className="h-2.5 w-2.5" />
+                          {Meta.label}
+                        </button>
+                      );
+                    })}
+                  </div>
                   <input
                     autoFocus
-                    value={newWaitingText}
-                    onChange={e => setNewWaitingText(e.target.value)}
+                    value={newBlockerTitle}
+                    onChange={e => setNewBlockerTitle(e.target.value)}
                     onKeyDown={e => {
-                      if (e.key === 'Enter') {
-                        const trimmed = newWaitingText.trim();
-                        if (trimmed) {
-                          update({
-                            waitingFor: [...(task.waitingFor ?? []), {
-                              id: `wf-${Date.now()}`,
-                              title: trimmed,
-                              completed: false,
-                            }],
-                          });
-                          setNewWaitingText('');
-                        }
-                      }
-                      if (e.key === 'Escape') {
-                        setWaitingInputVisible(false);
-                        setNewWaitingText('');
-                      }
+                      if (e.key === 'Enter') handleAddBlocker();
+                      if (e.key === 'Escape') { setBlockerInputVisible(false); setNewBlockerTitle(''); setNewBlockerOwner(''); }
                     }}
-                    onBlur={() => {
-                      if (!newWaitingText.trim()) setWaitingInputVisible(false);
+                    placeholder="What's blocking this task?"
+                    className="w-full bg-transparent text-xs text-foreground outline-none placeholder:text-muted-foreground/30"
+                  />
+                  <input
+                    value={newBlockerOwner}
+                    onChange={e => setNewBlockerOwner(e.target.value)}
+                    onKeyDown={e => {
+                      if (e.key === 'Enter') handleAddBlocker();
+                      if (e.key === 'Escape') { setBlockerInputVisible(false); setNewBlockerTitle(''); setNewBlockerOwner(''); }
                     }}
-                    placeholder="What are you waiting for?"
-                    className="flex-1 bg-transparent text-xs text-foreground outline-none placeholder:text-muted-foreground/30"
+                    placeholder="From whom? (optional)"
+                    className="w-full bg-transparent text-[10px] text-foreground/60 outline-none placeholder:text-muted-foreground/20"
                   />
                 </div>
               ) : (
-                <div className={cn((task.waitingFor ?? []).length > 0 && 'border-t border-white/[0.04]')}>
+                <div className={cn(
+                  (activeBlockers.length > 0 || (showResolved && resolvedBlockers.length > 0)) && 'border-t border-border/50',
+                )}>
                   <button
-                    onClick={() => setWaitingInputVisible(true)}
+                    onClick={() => setBlockerInputVisible(true)}
                     className="flex w-full items-center gap-2 px-3 py-2.5 text-xs text-muted-foreground/40 transition-colors hover:text-muted-foreground"
                   >
                     <Plus className="h-3 w-3" />
-                    Add item
+                    Add blocker
                   </button>
                 </div>
               )}
@@ -528,7 +609,7 @@ export function TaskDetailsDrawer({
           {/* Artifacts */}
           <div className="space-y-2">
             <Label className="text-[11px] text-muted-foreground/70">Artifacts</Label>
-            <div className="overflow-hidden rounded-xl border border-white/[0.05] bg-muted/20">
+            <div className="overflow-hidden rounded-xl border border-border bg-muted/20">
               {taskArtifacts.length > 0 ? (
                 taskArtifacts.map((artifact, i) => {
                   const ArtifactIcon = ARTIFACT_TYPE_ICONS[artifact.type] || FileText;
@@ -538,8 +619,8 @@ export function TaskDetailsDrawer({
                       key={artifact.id}
                       onClick={() => onArtifactClick(artifact)}
                       className={cn(
-                        'flex w-full items-center gap-2.5 px-3 py-2.5 text-left transition-colors hover:bg-white/[0.04]',
-                        i > 0 && 'border-t border-white/[0.04]',
+                        'flex w-full items-center gap-2.5 px-3 py-2.5 text-left transition-colors hover:bg-surface',
+                        i > 0 && 'border-t border-border/50',
                       )}
                     >
                       <ArtifactIcon className={cn('h-3.5 w-3.5 shrink-0', artifactColor)} />
@@ -550,7 +631,19 @@ export function TaskDetailsDrawer({
                     </button>
                   );
                 })
-              ) : (
+              ) : null}
+              {onArtifactCreate && (
+                <div className={cn(taskArtifacts.length > 0 && 'border-t border-border/50')}>
+                  <button
+                    onClick={() => onArtifactCreate(task.id)}
+                    className="flex w-full items-center gap-2 px-3 py-2.5 text-xs text-muted-foreground/40 transition-colors hover:text-muted-foreground"
+                  >
+                    <Plus className="h-3 w-3" />
+                    Add artifact
+                  </button>
+                </div>
+              )}
+              {taskArtifacts.length === 0 && !onArtifactCreate && (
                 <div className="px-3 py-4 text-xs text-muted-foreground/30 text-center">
                   No artifacts linked
                 </div>
@@ -575,7 +668,7 @@ export function TaskDetailsDrawer({
       </ScrollArea>
 
       {/* Footer — pinned */}
-      <div className="shrink-0 flex items-center justify-between border-t border-white/[0.06] px-5 py-3">
+      <div className="shrink-0 flex items-center justify-between border-t border-border px-5 py-3">
         <span className="text-[11px] text-muted-foreground/40">
           {task.createdAt ? format(new Date(task.createdAt), 'MMM d, yyyy') : ''}
         </span>
@@ -658,8 +751,7 @@ export function TaskDetailsDrawer({
               whileHover={{ opacity: 1 }}
               transition={{ delay: 0.25, type: 'spring', stiffness: 320, damping: 28 }}
               onClick={() => onOpenChange(false)}
-              style={{ backgroundColor: '#1c1c1a' }}
-              className="fixed top-8 right-[460px] z-50 flex h-[60px] w-8 items-center justify-center rounded-full text-muted-foreground shadow-lg border border-white/[0.08] hover:text-foreground transition-colors"
+              className="fixed top-8 right-[460px] z-50 flex h-[60px] w-8 items-center justify-center rounded-full bg-drawer text-muted-foreground shadow-lg border border-border hover:text-foreground transition-colors"
             >
               <X className="h-3.5 w-3.5" />
             </motion.button>
@@ -671,8 +763,8 @@ export function TaskDetailsDrawer({
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.88 }}
               transition={{ type: 'spring', stiffness: 420, damping: 32, mass: 0.7 }}
-              style={{ backgroundColor: '#1c1c1a', transformOrigin: 'top right' }}
-              className="fixed top-8 right-8 bottom-8 z-50 w-[420px] rounded-2xl shadow-2xl border border-white/[0.08] overflow-hidden flex flex-col"
+              style={{ transformOrigin: 'top right' }}
+              className="fixed top-8 right-8 bottom-8 z-50 w-[420px] rounded-2xl bg-drawer shadow-2xl border border-border overflow-hidden flex flex-col"
             >
               <div className="flex-1 min-h-0 overflow-y-auto">{content}</div>
             </motion.div>
