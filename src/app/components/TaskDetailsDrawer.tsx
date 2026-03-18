@@ -53,7 +53,7 @@ const getPhaseStyle = (id: string) => PHASE_COLORS[id] ?? { color: 'text-muted-f
 
 // ─── Searchable picker popover ──────────────────────────────────────────────
 
-function PickerPopover({
+export function PickerPopover({
   open,
   onOpenChange,
   trigger,

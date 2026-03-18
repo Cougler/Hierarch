@@ -322,12 +322,6 @@ export function Briefing({
               <section>
                 <div className="flex items-center gap-3 mb-5">
                   <h2 className="text-sm font-semibold">Active Projects</h2>
-                  <button
-                    onClick={() => onViewChange('tasks')}
-                    className="text-xs text-primary hover:text-primary/80 transition-colors"
-                  >
-                    View all
-                  </button>
                 </div>
 
                 {!hasActiveProjects ? (
@@ -347,8 +341,8 @@ export function Briefing({
                     )}
                   </div>
                 ) : (
-                  <div className="space-y-2">
-                    {activeProjects.map(({ project, taskCount, lastActivity }) => {
+                  <div className="space-y-4">
+                    {activeProjects.map(({ project, taskCount, lastActivity }, index) => {
                       const projectAttention = attentionByProject.get(project.id) || []
                       const projectNotes = notesByProject.get(project.id) || []
                       const ProjectIcon = getIconComponent(project.metadata?.icon)
@@ -358,7 +352,7 @@ export function Briefing({
                           {/* Project row */}
                           <div
                             onClick={() => setPreviewProject(project)}
-                            className="group flex items-center gap-3 py-2 cursor-pointer transition-colors hover:bg-accent/20 rounded-lg"
+                            className="group flex items-center gap-3 py-2 px-3 cursor-pointer transition-colors bg-accent/[0.20] hover:bg-accent/30 rounded-lg"
                           >
                             <div className="flex-1 min-w-0 flex items-center gap-2">
                               <ProjectIcon className="h-3.5 w-3.5 shrink-0 text-foreground/50" />
@@ -383,7 +377,7 @@ export function Briefing({
                                   onClick={() => onDrawerTaskClick ? onDrawerTaskClick(item.task) : onTaskClick(item.task)}
                                   className="w-full flex items-center gap-2 py-1.5 pl-2 rounded-md text-left transition-colors hover:bg-accent/20"
                                 >
-                                  <img src="/arrow-down-right.svg" alt="" className="h-3 w-3 shrink-0 opacity-40 invert-on-light" />
+                                  <img src="/anglearrow.svg" alt="" className="h-3 w-3 shrink-0 opacity-40 invert-on-light" />
                                   <span className="text-[13px] text-foreground/80 truncate">{item.task.title}</span>
                                   <span className="text-xs text-muted-foreground/70 shrink-0 ml-auto">{item.reason}</span>
                                 </button>

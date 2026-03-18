@@ -63,7 +63,7 @@ function NavItem({
     <button
       onClick={onClick}
       className={cn(
-        'flex w-full items-center gap-3 rounded-md px-3 py-1.5 text-[13px] transition-colors',
+        'flex w-full items-center gap-3 rounded-md pl-1.5 pr-3 py-1.5 text-[13px] transition-colors',
         isActive
           ? 'bg-accent text-foreground font-medium'
           : 'text-foreground/60 hover:bg-accent/60 hover:text-foreground'
@@ -261,7 +261,7 @@ export function Sidebar({
                   <button
                     onClick={() => { onViewChange(viewKey); onClose?.(); }}
                     className={cn(
-                      'flex w-full items-center gap-3 rounded-md px-3 py-1.5 text-sm transition-colors',
+                      'flex w-full items-center gap-3 rounded-md pl-1.5 pr-3 py-1.5 text-sm transition-colors',
                       activeView === viewKey
                         ? 'bg-accent text-foreground font-medium'
                         : 'text-foreground/60 hover:bg-accent/60 hover:text-foreground'
@@ -341,7 +341,7 @@ export function Sidebar({
               <button
                 onClick={() => { onViewChange('linear'); onClose?.(); }}
                 className={cn(
-                  'flex w-full items-center gap-3 rounded-md px-3 py-1.5 text-sm transition-colors',
+                  'flex w-full items-center gap-3 rounded-md pl-1.5 pr-3 py-1.5 text-sm transition-colors',
                   activeView === 'linear'
                     ? 'bg-accent text-foreground font-medium'
                     : 'text-foreground/60 hover:bg-accent/60 hover:text-foreground'
@@ -355,7 +355,7 @@ export function Sidebar({
               <button
                 onClick={() => { onViewChange('figma'); onClose?.(); }}
                 className={cn(
-                  'flex w-full items-center gap-3 rounded-md px-3 py-1.5 text-sm transition-colors',
+                  'flex w-full items-center gap-3 rounded-md pl-1.5 pr-3 py-1.5 text-sm transition-colors',
                   activeView === 'figma'
                     ? 'bg-accent text-foreground font-medium'
                     : 'text-foreground/60 hover:bg-accent/60 hover:text-foreground'

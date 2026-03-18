@@ -56,6 +56,7 @@ export function IntegrationsPage({ onViewChange }: IntegrationsPageProps) {
       icon: <Figma className="h-5 w-5" />,
       connected: figma.isConnected,
       loading: figma.isLoading,
+      comingSoon: window.location.hostname !== 'localhost',
       onClick: () => figma.isConnected ? onViewChange('figma') : handleConnect('figma', figma.startOAuth),
       onDisconnect: (e: React.MouseEvent) => handleDisconnect(e, 'Figma', figma.disconnect),
     },

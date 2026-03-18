@@ -111,6 +111,15 @@ export async function getTeams(token: string): Promise<LinearTeam[]> {
   return data.teams.nodes
 }
 
+export async function getTeamMembers(token: string, teamId: string): Promise<LinearUser[]> {
+  const data = await gql<{ team: { members: { nodes: LinearUser[] } } }>(
+    token,
+    `query($teamId: String!) { team(id: $teamId) { members { nodes { id name email avatarUrl } } } }`,
+    { teamId }
+  )
+  return data.team.members.nodes
+}
+
 export async function getTeamStatuses(token: string, teamId: string): Promise<LinearStatus[]> {
   const data = await gql<{ team: { states: { nodes: LinearStatus[] } } }>(
     token,
@@ -176,6 +185,7 @@ export async function updateIssue(
     description?: string
     priority?: number
     title?: string
+    assigneeId?: string
   }
 ): Promise<LinearIssue> {
   const data = await gql<{ issueUpdate: { issue: LinearIssueRaw } }>(
