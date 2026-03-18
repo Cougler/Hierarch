@@ -1,11 +1,11 @@
 'use client';
 
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import { cn } from '@/app/lib/utils';
 import { Button } from '@/app/components/ui/button';
 import { motion } from 'motion/react';
 import {
-  CalendarRange, Settings2,
+  CalendarRange, Settings2, Plus,
 } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import type { Task, Project, StatusConfig } from '@/app/types';
@@ -49,6 +49,17 @@ export function ProjectDetails({
 }: ProjectDetailsProps) {
   const [detailsDrawerOpen, setDetailsDrawerOpen] = useState(false);
   const nameRef = useRef<HTMLInputElement>(null);
+  const autoOpenedRef = useRef(false);
+
+  // Auto-open details dialog for empty projects (no tasks, no description, no phase)
+  useEffect(() => {
+    if (autoOpenedRef.current) return;
+    const hasDetails = project.description || project.metadata?.phase || project.metadata?.start_date || project.metadata?.end_date;
+    if (tasks.length === 0 && !hasDetails) {
+      autoOpenedRef.current = true;
+      setDetailsDrawerOpen(true);
+    }
+  }, [project.id]);
 
   const ProjectIcon = getIconComponent(project.metadata?.icon);
 
@@ -93,17 +104,19 @@ export function ProjectDetails({
 
           </div>
 
-          {/* Edit details button + date range stacked on the right */}
+          {/* Edit details + add task buttons, date range stacked on the right */}
           <div className="flex shrink-0 flex-col items-end gap-1.5">
-            <Button
-              variant="outline"
-              size="sm"
-              className="h-7 gap-1.5 text-xs"
-              onClick={() => setDetailsDrawerOpen(true)}
-            >
-              <Settings2 className="h-3 w-3" />
-              Details
-            </Button>
+            <div className="flex items-center gap-1.5">
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-7 gap-1.5 text-xs"
+                onClick={() => setDetailsDrawerOpen(true)}
+              >
+                <Settings2 className="h-3 w-3" />
+                Details
+              </Button>
+            </div>
             {(project.metadata?.start_date || project.metadata?.end_date) && (
               <div className="flex items-center gap-1 text-xs text-muted-foreground">
                 <CalendarRange className="h-3 w-3 shrink-0" />

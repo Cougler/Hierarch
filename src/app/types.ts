@@ -91,6 +91,10 @@ export interface BlockerItem {
   id: string;
   title: string;
   completed: boolean;
+  type?: BlockerType;
+  owner?: string;
+  createdAt?: string;
+  resolvedAt?: string;
 }
 
 export interface StatusConfig {

@@ -742,6 +742,7 @@ export function TaskBoard({
               onCreateNote={onCreateNote}
               focusTaskId={focusTaskId}
               columns={listColumns}
+              hideProject={!!projectFilter}
               inlineCreating={inlineCreating}
               onStartInline={() => setInlineCreating(true)}
               onInlineSave={(title) => {
@@ -757,6 +758,7 @@ export function TaskBoard({
                 });
               }}
               onInlineCancel={() => setInlineCreating(false)}
+              onNewTask={onNewTask}
             />
           )}
 
@@ -939,10 +941,12 @@ interface ListViewProps {
   onCreateNote?: (task: Task) => void;
   focusTaskId?: string | null;
   columns: { id: string; title: string; visible: boolean; width: number }[];
+  hideProject?: boolean;
   inlineCreating: boolean;
   onStartInline: () => void;
   onInlineSave: (title: string) => void;
   onInlineCancel: () => void;
+  onNewTask?: () => void;
 }
 
 function ListView({
@@ -960,12 +964,17 @@ function ListView({
   onCreateNote,
   focusTaskId,
   columns,
+  hideProject,
   inlineCreating,
   onStartInline,
   onInlineSave,
   onInlineCancel,
+  onNewTask,
 }: ListViewProps) {
-  const { widths, columnTemplate, onResizeStart } = useColumnWidths();
+  const { widths, columnTemplate: fullColumnTemplate, onResizeStart } = useColumnWidths();
+  const columnTemplate = hideProject
+    ? `40px ${widths.title}px ${widths.due}px 64px`
+    : fullColumnTemplate;
 
   const allSelected = tasks.length > 0 && tasks.every(t => selectedIds.has(t.id));
   const someSelected = !allSelected && tasks.some(t => selectedIds.has(t.id));
@@ -996,6 +1005,7 @@ function ListView({
               onCreateNote={onCreateNote}
               focusTaskId={focusTaskId}
               columnTemplate={columnTemplate}
+              hideProject={hideProject}
             />
           </motion.div>
         ))}
@@ -1022,10 +1032,12 @@ function ListView({
             Task
             <div onMouseDown={onResizeStart('title', widths.title)} className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-border rounded" />
           </div>
-          <div className="relative px-2">
-            Project
-            <div onMouseDown={onResizeStart('project', widths.project)} className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-border rounded" />
-          </div>
+          {!hideProject && (
+            <div className="relative px-2">
+              Project
+              <div onMouseDown={onResizeStart('project', widths.project)} className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-border rounded" />
+            </div>
+          )}
           <div className="relative px-2">
             Due Date
           </div>
@@ -1048,8 +1060,16 @@ function ListView({
         )}
 
         {tasks.length === 0 && !inlineCreating && (
-          <div className="flex h-32 flex-col items-center justify-center gap-2 text-muted-foreground">
+          <div className="flex h-32 flex-col items-center justify-center gap-3 text-muted-foreground">
             <p className="text-sm">No tasks yet</p>
+            <Button
+              size="sm"
+              className="h-7 gap-1.5 text-xs bg-[#bf7535] hover:bg-[#bf7535]/90"
+              onClick={() => onNewTask ? onNewTask() : onStartInline()}
+            >
+              <Plus className="h-3.5 w-3.5" />
+              Add Task
+            </Button>
           </div>
         )}
 
@@ -1059,11 +1079,12 @@ function ListView({
             onSave={onInlineSave}
             onCancel={onInlineCancel}
             columnTemplate={columnTemplate}
+            hideProject={hideProject}
           />
         )}
 
-        {/* Add a task affordance */}
-        {!inlineCreating && (
+        {/* Add a task affordance (hidden when empty) */}
+        {!inlineCreating && tasks.length > 0 && (
           <button
             onClick={onStartInline}
             className="flex w-full items-center gap-2 px-4 py-2.5 text-xs text-muted-foreground/30 hover:text-muted-foreground/70 transition-colors"
@@ -1083,10 +1104,12 @@ function InlineTaskRow({
   onSave,
   onCancel,
   columnTemplate,
+  hideProject,
 }: {
   onSave: (title: string) => void;
   onCancel: () => void;
   columnTemplate: string;
+  hideProject?: boolean;
 }) {
   const [value, setValue] = useState('');
   const inputRef = useRef<HTMLInputElement>(null);
@@ -1125,7 +1148,7 @@ function InlineTaskRow({
           className="w-full bg-transparent text-sm text-foreground outline-none placeholder:text-muted-foreground/40"
         />
       </div>
-      <div /> {/* project col */}
+      {!hideProject && <div />} {/* project col */}
       <div /> {/* due col */}
       <div /> {/* more col */}
     </div>

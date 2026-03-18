@@ -60,6 +60,7 @@ interface TaskRowProps {
   onCreateNote?: (task: Task) => void;
   focusTaskId?: string | null;
   columnTemplate?: string;
+  hideProject?: boolean;
 }
 
 export function TaskRow({
@@ -76,6 +77,7 @@ export function TaskRow({
   onCreateNote,
   focusTaskId,
   columnTemplate = '40px 1fr 200px 120px 64px',
+  hideProject,
 }: TaskRowProps) {
   const {
     attributes,
@@ -185,13 +187,15 @@ export function TaskRow({
         </div>
 
         {/* Project */}
-        <div className="min-w-0 overflow-hidden px-2 py-2" onClick={(e) => e.stopPropagation()}>
-          <ProjectCell
-            project={task.project}
-            projects={projects}
-            onChange={(id) => onUpdate(task.id, { project: id })}
-          />
-        </div>
+        {!hideProject && (
+          <div className="min-w-0 overflow-hidden px-2 py-2" onClick={(e) => e.stopPropagation()}>
+            <ProjectCell
+              project={task.project}
+              projects={projects}
+              onChange={(id) => onUpdate(task.id, { project: id })}
+            />
+          </div>
+        )}
 
         {/* Due date */}
         <div className="px-1 py-2" onClick={(e) => e.stopPropagation()}>

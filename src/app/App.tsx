@@ -9,6 +9,8 @@ import { DEMO_USER, DEMO_PROJECTS, DEMO_TASKS, DEMO_TIME_ENTRIES, DEMO_DESIGN_NO
 import { ThemeProvider } from './components/ThemeProvider'
 import { TooltipProvider } from './components/ui/tooltip'
 import { useIsMobile } from './hooks/use-mobile'
+import { handleLinearOAuthCallback } from './hooks/use-linear-token'
+import { handleFigmaOAuthCallback } from './hooks/use-figma-token'
 
 import Login from './components/Login'
 import Signup from './components/Signup'
@@ -163,6 +165,36 @@ export default function App() {
     return () => subscription.unsubscribe()
   }, [])
 
+  // Handle OAuth callbacks
+  useEffect(() => {
+    const path = window.location.pathname
+    if (path === '/auth/linear/callback') {
+      handleLinearOAuthCallback()
+        .then((success) => {
+          if (success) {
+            toast.success('Connected to Linear')
+            setActiveView('linear')
+          }
+        })
+        .catch(() => {
+          toast.error('Failed to connect to Linear')
+          window.history.replaceState({}, '', '/')
+        })
+    } else if (path === '/auth/figma/callback') {
+      handleFigmaOAuthCallback()
+        .then((success) => {
+          if (success) {
+            toast.success('Connected to Figma')
+            setActiveView('figma')
+          }
+        })
+        .catch(() => {
+          toast.error('Failed to connect to Figma')
+          window.history.replaceState({}, '', '/')
+        })
+    }
+  }, [])
+
   const determineAuthState = async (u: any) => {
     // Auto-skip avatar step: mark it seen immediately for all new users.
     // Google users already have avatar_url set by Supabase; email users use initials.
@@ -187,9 +219,9 @@ export default function App() {
     setDrawerStack([])
   }
 
-  // Load data when authenticated
+  // Load data when authenticated or onboarding (dialog overlays real app)
   useEffect(() => {
-    if (authState !== 'authenticated') return
+    if (authState !== 'authenticated' && authState !== 'onboarding') return
     loadData()
   }, [authState])
 
@@ -206,9 +238,12 @@ export default function App() {
       api.getBlockersForUser(),
     ])
 
-    // Seed starter data for brand-new accounts
+    // New accounts start empty — no seeding, clear any stale localStorage artifacts
     if ((!projectsData || projectsData.length === 0) && (!tasksData || tasksData.length === 0)) {
-      await seedStarterData()
+      setProjects([])
+      setTasks([])
+      setArtifacts([])
+      localStorage.removeItem('hierarch-artifacts')
       setDataLoading(false)
       loadTimeEntries()
       return
@@ -829,6 +864,24 @@ export default function App() {
           }}
           onDrawerTaskClick={pushDrawerTask}
           onDrawerArtifactClick={pushDrawerArtifact}
+          onProjectCreate={() => {
+            const tempId = Math.random().toString(36).substr(2, 9)
+            const newProject: Project = {
+              id: tempId,
+              name: 'Untitled Project',
+              created_at: new Date().toISOString(),
+            }
+            setProjects(prev => [...prev, newProject])
+            handleViewChange(`project:${tempId}`)
+            if (!demoMode) {
+              api.createProject('Untitled Project').then(result => {
+                if (result) {
+                  setProjects(prev => prev.map(p => p.id === tempId ? { ...p, id: result.id } : p))
+                  handleViewChange(`project:${result.id}`)
+                }
+              })
+            }
+          }}
         />
       )
     }
@@ -991,20 +1044,19 @@ export default function App() {
     )
   }
 
-  if (authState === 'onboarding' || showOnboarding) {
-    return (
-      <ThemeProvider defaultTheme="dark">
-        <Toaster richColors position="top-right" />
-        <Onboarding onComplete={handleOnboardingComplete} />
-      </ThemeProvider>
-    )
-  }
-
   // Main app
   return (
     <ThemeProvider defaultTheme="dark">
       <TooltipProvider>
         <Toaster richColors position="top-right" />
+        {(authState === 'onboarding' || showOnboarding) && (
+          <Onboarding
+            onComplete={handleOnboardingComplete}
+            onCreateProject={handleProjectCreate}
+            onNavigateToProject={(name) => handleViewChange(`project:${name}`)}
+            demoMode={demoMode}
+          />
+        )}
         <div className="flex h-screen overflow-hidden bg-shell">
           {/* Desktop sidebar */}
           {!isMobile && (

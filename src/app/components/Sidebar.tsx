@@ -1,6 +1,10 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
+import { useLinearToken } from '@/app/hooks/use-linear-token';
+import { useFigmaToken } from '@/app/hooks/use-figma-token';
+import { useFigmaUnread } from '@/app/hooks/use-figma-unread';
+import { Figma } from 'lucide-react';
 
 import { cn } from '@/app/lib/utils';
 import { Button } from '@/app/components/ui/button';
@@ -59,7 +63,7 @@ function NavItem({
     <button
       onClick={onClick}
       className={cn(
-        'flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm transition-colors',
+        'flex w-full items-center gap-3 rounded-md px-3 py-1.5 text-[13px] transition-colors',
         isActive
           ? 'bg-accent text-foreground font-medium'
           : 'text-foreground/60 hover:bg-accent/60 hover:text-foreground'
@@ -109,7 +113,10 @@ export function Sidebar({
   const initials = userName.slice(0, 2).toUpperCase();
 
   const realProjects = projects.filter(p => p.metadata?.type !== 'section');
-  const hasLinear = !!localStorage.getItem('hierarch-linear-token');
+  const { isConnected: hasLinear } = useLinearToken();
+  const { isConnected: hasFigma } = useFigmaToken();
+  const figmaUnread = useFigmaUnread();
+  const hasAnyIntegration = hasLinear || hasFigma;
 
   useEffect(() => {
     if (creatingProject) {
@@ -261,7 +268,7 @@ export function Sidebar({
                     )}
                   >
                     <Icon className="h-4 w-4 shrink-0 text-foreground/50" />
-                    <span className="flex-1 text-left truncate">{project.name}</span>
+                    <span className="flex-1 text-left truncate text-[13px]">{project.name}</span>
                   </button>
                 </ContextMenuTrigger>
                 <ContextMenuContent>
@@ -300,19 +307,22 @@ export function Sidebar({
           )}
 
           {realProjects.length === 0 && !creatingProject && (
-            <button
-              onClick={() => setCreatingProject(true)}
-              className="flex w-full items-center gap-3 rounded-md px-3 py-1.5 text-sm text-foreground/30 hover:text-foreground/50 transition-colors"
-            >
-              <Plus className="h-4 w-4 shrink-0" />
-              <span>Add a project</span>
-            </button>
+            <div className="px-3 py-3 space-y-2">
+              <p className="text-xs text-foreground/30">Your projects will appear here</p>
+              <button
+                onClick={() => setCreatingProject(true)}
+                className="flex items-center gap-1.5 text-xs text-primary hover:text-primary/80 transition-colors"
+              >
+                <Plus className="h-3 w-3" />
+                Create a project
+              </button>
+            </div>
           )}
         </div>
       </div>
 
       {/* Integrations section — only show when an integration is connected */}
-      {hasLinear && (
+      {hasAnyIntegration && (
         <div className="px-3 mt-5">
           <div className="flex items-center justify-between mb-1 px-1">
             <span className="text-[11px] font-semibold uppercase tracking-wider text-foreground/40">
@@ -327,18 +337,39 @@ export function Sidebar({
           </div>
 
           <div className="space-y-0.5">
-            <button
-              onClick={() => { onViewChange('linear'); onClose?.(); }}
-              className={cn(
-                'flex w-full items-center gap-3 rounded-md px-3 py-1.5 text-sm transition-colors',
-                activeView === 'linear'
-                  ? 'bg-accent text-foreground font-medium'
-                  : 'text-foreground/60 hover:bg-accent/60 hover:text-foreground'
-              )}
-            >
-              <img src="/linear.svg" alt="Linear" className="h-3.5 w-3.5 shrink-0 opacity-50 invert-on-light" />
-              <span className="flex-1 text-left">Linear</span>
-            </button>
+            {hasLinear && (
+              <button
+                onClick={() => { onViewChange('linear'); onClose?.(); }}
+                className={cn(
+                  'flex w-full items-center gap-3 rounded-md px-3 py-1.5 text-sm transition-colors',
+                  activeView === 'linear'
+                    ? 'bg-accent text-foreground font-medium'
+                    : 'text-foreground/60 hover:bg-accent/60 hover:text-foreground'
+                )}
+              >
+                <img src="/linear.svg" alt="Linear" className="h-3.5 w-3.5 shrink-0 opacity-50 invert-on-light" />
+                <span className="flex-1 text-left">Linear</span>
+              </button>
+            )}
+            {hasFigma && (
+              <button
+                onClick={() => { onViewChange('figma'); onClose?.(); }}
+                className={cn(
+                  'flex w-full items-center gap-3 rounded-md px-3 py-1.5 text-sm transition-colors',
+                  activeView === 'figma'
+                    ? 'bg-accent text-foreground font-medium'
+                    : 'text-foreground/60 hover:bg-accent/60 hover:text-foreground'
+                )}
+              >
+                <Figma className="h-3.5 w-3.5 shrink-0 opacity-50" />
+                <span className="flex-1 text-left">Figma</span>
+                {figmaUnread > 0 && (
+                  <span className="rounded-full bg-primary px-1.5 py-0.5 text-[10px] font-medium text-primary-foreground leading-none">
+                    {figmaUnread}
+                  </span>
+                )}
+              </button>
+            )}
           </div>
         </div>
       )}
@@ -347,7 +378,7 @@ export function Sidebar({
       <div className="flex-1" />
 
       {/* Integrations nav item — show when no integrations connected */}
-      {!hasLinear && (
+      {!hasAnyIntegration && (
         <div className="px-3 pb-2">
           <NavItem
             icon={<Plug className="h-4 w-4 shrink-0" />}

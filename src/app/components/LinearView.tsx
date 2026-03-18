@@ -23,64 +23,9 @@ import { Separator } from './ui/separator'
 import { cn } from '../lib/utils'
 import * as linearApi from '../api/linear'
 import type { LinearIssue, LinearTeam, LinearStatus, DesignMeta } from '../api/linear'
+import { useLinearToken } from '../hooks/use-linear-token'
 
-const TOKEN_KEY = 'hierarch-linear-token'
 const TEAM_KEY = 'hierarch-linear-team'
-
-// ── Setup Screen ────────────────────────────────────────────────────────────
-
-function LinearSetup({ onConnect }: { onConnect: (token: string) => void }) {
-  const [token, setToken] = useState('')
-  const [loading, setLoading] = useState(false)
-
-  const handleConnect = async () => {
-    const t = token.trim()
-    if (!t) return
-    setLoading(true)
-    try {
-      await linearApi.getViewer(t)
-      localStorage.setItem(TOKEN_KEY, t)
-      onConnect(t)
-      toast.success('Connected to Linear')
-    } catch {
-      toast.error('Invalid API key — check your Linear personal token')
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  return (
-    <div className="flex flex-col items-center justify-center h-full min-h-[400px] gap-6 px-4">
-      <div className="flex flex-col items-center gap-3 text-center max-w-sm">
-        <div className="w-12 h-12 rounded-2xl bg-[#5E6AD2]/20 flex items-center justify-center">
-          <Layers className="h-6 w-6 text-[#5E6AD2]" />
-        </div>
-        <h2 className="text-xl font-semibold">Connect to Linear</h2>
-        <p className="text-sm text-muted-foreground">
-          Enter your Linear personal API key to manage design work alongside your team's issues.
-        </p>
-        <p className="text-xs text-muted-foreground">
-          Get it at{' '}
-          <span className="font-mono text-[#5E6AD2]">linear.app → Settings → API → Personal API keys</span>
-        </p>
-      </div>
-
-      <div className="w-full max-w-sm flex gap-2">
-        <Input
-          type="password"
-          placeholder="lin_api_…"
-          value={token}
-          onChange={e => setToken(e.target.value)}
-          onKeyDown={e => e.key === 'Enter' && handleConnect()}
-          className="font-mono text-sm"
-        />
-        <Button onClick={handleConnect} disabled={loading || !token.trim()} className="shrink-0">
-          {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Connect'}
-        </Button>
-      </div>
-    </div>
-  )
-}
 
 // ── Priority Badge ──────────────────────────────────────────────────────────
 
@@ -814,7 +759,7 @@ function TeamSelector({
 // ── Root LinearView ─────────────────────────────────────────────────────────
 
 export function LinearView() {
-  const [token, setToken] = useState<string | null>(() => localStorage.getItem(TOKEN_KEY))
+  const { token, isConnected, isLoading, disconnect } = useLinearToken()
   const [teams, setTeams] = useState<LinearTeam[]>([])
   const [selectedTeam, setSelectedTeam] = useState<LinearTeam | null>(() => {
     const saved = localStorage.getItem(TEAM_KEY)
@@ -838,26 +783,29 @@ export function LinearView() {
       .finally(() => setLoadingTeams(false))
   }, [token, selectedTeam])
 
-  const handleConnect = (t: string) => {
-    setToken(t)
-    setSelectedTeam(null)
-  }
-
   const handleTeamSelect = (team: LinearTeam) => {
     setSelectedTeam(team)
     localStorage.setItem(TEAM_KEY, JSON.stringify(team))
   }
 
-  const handleDisconnect = () => {
-    localStorage.removeItem(TOKEN_KEY)
+  const handleDisconnect = async () => {
+    await disconnect()
     localStorage.removeItem(TEAM_KEY)
-    setToken(null)
     setSelectedTeam(null)
     setTeams([])
     toast.success('Disconnected from Linear')
   }
 
-  if (!token) return (
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-full min-h-[400px] gap-2 text-muted-foreground">
+        <Loader2 className="h-5 w-5 animate-spin" />
+        <span className="text-sm">Loading…</span>
+      </div>
+    )
+  }
+
+  if (!isConnected || !token) return (
     <div className="flex flex-col items-center justify-center h-full min-h-[400px] gap-4 text-center px-4">
       <img src="/linear.svg" alt="Linear" className="h-8 w-8 opacity-40 invert-on-light" />
       <p className="text-sm text-muted-foreground">Linear is not connected. Connect it from the Integrations page.</p>

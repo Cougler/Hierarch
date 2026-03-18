@@ -58,6 +58,7 @@ interface BriefingProps {
   onPreviewProjectChange: (project: Project | null) => void
   onDrawerTaskClick?: (task: Task) => void
   onDrawerArtifactClick?: (artifact: Artifact) => void
+  onProjectCreate?: () => void
 }
 
 function getTimeOfDay(): string {
@@ -94,6 +95,7 @@ export function Briefing({
   onProjectUpdate,
   onDrawerTaskClick,
   onDrawerArtifactClick,
+  onProjectCreate,
 }: BriefingProps) {
   const firstName = userName.split(' ')[0]
   const setPreviewProject = onPreviewProjectChange
@@ -329,8 +331,20 @@ export function Briefing({
                 </div>
 
                 {!hasActiveProjects ? (
-                  <div className="rounded-xl border border-border/30 bg-card/20 px-5 py-10 text-center">
-                    <p className="text-sm text-muted-foreground">No active projects yet.</p>
+                  <div className="rounded-xl border border-border/30 bg-card/20 px-5 py-10 text-center space-y-3">
+                    <Folder className="h-6 w-6 mx-auto text-muted-foreground/30" />
+                    <p className="text-sm text-muted-foreground">Projects you're working on will show up here with their tasks and status.</p>
+                    {onProjectCreate && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-8 gap-1.5 text-xs"
+                        onClick={onProjectCreate}
+                      >
+                        <Plus className="h-3 w-3" />
+                        Create a project
+                      </Button>
+                    )}
                   </div>
                 ) : (
                   <div className="space-y-2">
@@ -357,11 +371,6 @@ export function Briefing({
                               </span>
                             </div>
                             <div className="flex items-center gap-1.5 shrink-0">
-                              {projectAttention.length > 0 ? (
-                                <span className="text-[10px] text-attention">
-                                  {projectAttention.length} needs attention
-                                </span>
-                              ) : null}
                               <ChevronRight className="h-3.5 w-3.5 text-muted-foreground/30" />
                             </div>
                           </div>
@@ -375,7 +384,7 @@ export function Briefing({
                                   className="w-full flex items-center gap-2 py-1.5 pl-2 rounded-md text-left transition-colors hover:bg-accent/20"
                                 >
                                   <img src="/arrow-down-right.svg" alt="" className="h-3 w-3 shrink-0 opacity-40 invert-on-light" />
-                                  <span className="text-sm text-foreground/80 truncate">{item.task.title}</span>
+                                  <span className="text-[13px] text-foreground/80 truncate">{item.task.title}</span>
                                   <span className="text-xs text-muted-foreground/70 shrink-0 ml-auto">{item.reason}</span>
                                 </button>
                               ))}
@@ -408,7 +417,7 @@ export function Briefing({
                                   : '#64748b',
                             }}
                           />
-                          <span className="text-xs text-foreground/70 truncate">{item.task.title}</span>
+                          <span className="text-[13px] text-foreground/70 truncate">{item.task.title}</span>
                           <span className="text-[10px] text-muted-foreground/50 shrink-0 ml-auto">{item.reason}</span>
                         </button>
                       ))}
@@ -424,8 +433,48 @@ export function Briefing({
               <h2 className="text-sm font-semibold mb-4 shrink-0">Recent Progress</h2>
 
               {!hasActivity ? (
-                <div className="rounded-xl border border-border/30 bg-card/20 px-5 py-10 text-center">
-                  <p className="text-sm text-muted-foreground">No recent activity.</p>
+                <div className="rounded-xl border border-border/30 bg-card/20 overflow-hidden">
+                  <div className="p-2 opacity-30 pointer-events-none select-none">
+                    {/* Faded example: status change */}
+                    <div className="flex items-center gap-3 px-3 py-2.5 rounded-lg">
+                      <div className="w-2 h-2 rounded-full shrink-0 bg-blue-500" />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs text-foreground truncate">Draft the navigation structure</p>
+                        <p className="text-[10px] text-muted-foreground mt-0.5">To Do <ArrowRight className="inline h-2.5 w-2.5" /> In Progress</p>
+                      </div>
+                      <span className="text-xs text-muted-foreground/60 shrink-0">2h ago</span>
+                    </div>
+                    {/* Faded example: task created */}
+                    <div className="flex items-center gap-3 px-3 py-2.5 rounded-lg">
+                      <ListPlus className="h-3.5 w-3.5 text-blue-400 shrink-0" />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs text-foreground truncate">Review competitor analysis</p>
+                        <p className="text-[10px] text-muted-foreground mt-0.5">Task created <span className="ml-1.5 text-muted-foreground/60">· Research</span></p>
+                      </div>
+                      <span className="text-xs text-muted-foreground/60 shrink-0">5h ago</span>
+                    </div>
+                    {/* Faded example: note created */}
+                    <div className="flex items-center gap-3 px-3 py-2.5 rounded-lg">
+                      <FileText className="h-3.5 w-3.5 text-violet-400 shrink-0" />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs text-foreground truncate">User interview insights</p>
+                        <p className="text-[10px] text-muted-foreground mt-0.5">Note created <span className="ml-1.5 text-muted-foreground/60">· Discovery</span></p>
+                      </div>
+                      <span className="text-xs text-muted-foreground/60 shrink-0">1d ago</span>
+                    </div>
+                    {/* Faded example: note edited */}
+                    <div className="flex items-center gap-3 px-3 py-2.5 rounded-lg">
+                      <PenLine className="h-3.5 w-3.5 text-attention shrink-0" />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs text-foreground truncate">Design system decisions</p>
+                        <p className="text-[10px] text-muted-foreground mt-0.5">Note edited</p>
+                      </div>
+                      <span className="text-xs text-muted-foreground/60 shrink-0">1d ago</span>
+                    </div>
+                  </div>
+                  <div className="px-5 pb-5 pt-2 text-center">
+                    <p className="text-xs text-muted-foreground/60">Your activity from the last 48 hours will appear here.</p>
+                  </div>
                 </div>
               ) : (
                 <div className="flex-1 min-h-0 rounded-xl border border-border/30 bg-card/20 backdrop-blur-xl overflow-hidden">

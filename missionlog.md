@@ -403,3 +403,150 @@ Light mode is fully themed with dynamic CSS variable tokens (shell, drawer, surf
 - Continue DataTable refactor
 
 ---
+
+## 2026-03-17 — Project phases, task statuses, onboarding redesign, project drawer overhaul
+
+Projects now own the design phases (Research/Explore/Design/Iterate/Review/Handoff) while tasks use simple statuses (To Do/In Progress/Feedback/Done). The blockers system is fully wired with selectedTask sync fixed. Project drawer is redesigned with inline editable description, Popover phase picker, compact stats, artifacts section with type icons, and pinned footer. Onboarding is a 4-step flow with mock UI. Deployed to hierarchical.app.
+
+**Done this session:**
+- Separated project phases from task statuses: `PROJECT_PHASES` (6 design phases) + `DEFAULT_STATUSES` (4 task statuses)
+- Added `phase` to `ProjectMetadata`, stored in Supabase metadata JSONB
+- Phase picker in ProjectDetailsDrawer and ProjectDrawerContent using same Popover dropdown as task drawer
+- Inline editable description textarea in project drawer (saves on blur)
+- Compact metric stats replacing card grid (inline text: "3 active 2 done 5 artifacts")
+- Pinned footer in project drawer for "Open full project view"
+- Artifacts section in project drawer with type icons, "+ Add" button, styled container
+- Renamed "Design Notes" to "Artifacts" in project drawer
+- Removed "Blocked" task status (handled entirely by blockers system)
+- Fixed blocker state sync: all blocker handlers now update both `tasks` and `selectedTask`
+- Redesigned onboarding: 4 steps (Welcome + phases, Feedback loop, Data model grid, Overview standup)
+- Onboarding uses mock UI components (phase list, review flow, 2x2 grid, overview dashboard)
+- Navigation moved to right column with large round Next button, progress dots + Back/Skip at top
+- "As a designer, I..." user stories in step 3 alongside the data model grid
+- Needs-attention tasks nested under parent projects with arrow-down-right SVG icon
+- "View all" moved next to "Active Projects" label
+- Increased contrast on attention task titles and reasons
+- Renamed artifact type "Quick Note" to "Note"
+- Updated all demo data to use new task statuses
+- Added project phases to demo project metadata
+- `LEGACY_STATUS_MAP` updated to map old phase IDs to new task statuses
+- Deployed to hierarchical.app
+
+**Up next:**
+- Build Insights view for phase analytics
+- Linear OAuth flow
+- Push to GitHub
+- DataTable refactor
+- Continue light mode polish
+
+---
+
+## 2026-03-17 — Project details dialog, empty state placeholders, new account cleanup
+
+Project details is now a dialog with save/cancel, Popover phase picker, and typed blockers (person/team/external/task with resolve/unresolve). Task drawer labels "Status" correctly, project column hides on project pages. New accounts start empty with descriptive placeholders on the Overview (faded activity examples in Recent Progress, create-project CTA in Active Projects) and sidebar. Starter data seeding and stale localStorage artifacts are cleared for fresh accounts. Next: build Insights view, Linear OAuth flow, push to GitHub.
+
+**Done this session:**
+- Converted ProjectDetailsDrawer from floating panel to Dialog with Save/Cancel buttons (buffered edits)
+- Phase picker in dialog uses Popover dropdown with 2-col grid matching ProjectDrawerContent
+- Blockers in dialog upgraded from ChecklistSection to typed blocker system (person/team/external/task pills, age badges, resolve/unresolve, collapsible resolved section)
+- Extended BlockerItem type with optional type, owner, createdAt, resolvedAt fields (backward compatible)
+- Task drawer "Phase" label renamed to "Status" for correctness
+- Project column hidden on project pages (TaskBoard, ListView, TaskRow, InlineTaskRow)
+- Auto-open project details dialog when navigating to a project with no tasks and no details
+- Removed starter data seeding for new accounts (no more pre-filled Getting Started project)
+- New accounts clear stale localStorage artifacts on first load
+- Sidebar empty project list: "Your projects will appear here" + "Create a project" CTA
+- Overview Active Projects empty state: folder icon, descriptive text, "Create a project" button
+- Overview Recent Progress empty state: 4 faded example activity rows (status change, task created, note created, note edited) with caption
+- Sidebar nav items adjusted to 13px font and reduced vertical padding
+
+**Up next:**
+- Build Insights view for phase analytics
+- Linear OAuth flow
+- Push to GitHub
+- DataTable refactor
+- Continue light mode polish
+
+---
+
+## 2026-03-17 — Onboarding redesign, project page Add Task, Overview polish
+
+Onboarding is redesigned as a 6-slide image-based walkthrough dialog overlaying the real app, covering Projects, Tasks, Artifacts, Overview, and Capacity. The project page header now has an Add Task button next to Details, and the empty task list shows a centered Add Task CTA instead of the inline affordance. Overview needs-attention tasks use 13px text and the per-project attention badge is removed. Next: build Insights view, Linear OAuth flow, push to GitHub.
+
+**Done this session:**
+- Redesigned onboarding as 6-slide image-based dialog overlay (replaces old 4-step mock UI flow)
+- Uses Radix DialogPrimitive with custom transparent overlay (`bg-black/40 backdrop-blur-sm`)
+- Slides use images from `/public/page1-6.webp` with text left or top, amber accent keywords
+- Same experience for demo and real users (removed project creation steps from onboarding)
+- Data loads during `'onboarding'` auth state so the real app renders behind the dialog
+- Added "Add Task" button to project page header next to "Details" button
+- Empty task list shows centered "Add Task" button, hides inline "+ Add a task..." affordance when empty
+- Sidebar project names set to `text-[13px]`
+- Overview needs-attention task titles set to `text-[13px]`
+- Removed per-project "X needs attention" badge from project rows on Overview
+
+**Up next:**
+- Build Insights view for phase analytics
+- Linear OAuth flow
+- Push to GitHub
+- DataTable refactor
+- Continue light mode polish
+
+---
+
+## 2026-03-18 — Linear and Figma OAuth integrations, webhook-based comments
+
+Linear and Figma OAuth integrations are fully built with Supabase Edge Function routes, token storage in an integrations table with RLS, auto-refresh on 401, and reactive sidebar badges. Figma comments flow through a team webhook into a figma_comments table, with a threaded chat UI for viewing and replying. The Add Task button is removed from the project page header. Next: deploy edge function for Figma webhooks, test the full Figma comment flow, build Insights view, push to GitHub.
+
+**Done this session:**
+- Created `integrations` Supabase table with RLS (owner_id, provider, access_token, refresh_token, token_expires_at, provider_metadata)
+- Built Linear OAuth flow: 4 edge function routes (authorize, callback, refresh, disconnect), client-side state validation via sessionStorage, `useLinearToken` hook as single source of truth
+- Built Figma OAuth flow: same pattern (4 edge function routes, `useFigmaToken` hook, callback handler in App.tsx)
+- OAuth callback in App.tsx navigates to the integration's page (Linear or Figma) after successful connection
+- Custom event system (`LINEAR_TOKEN_CHANGED`, `FIGMA_TOKEN_CHANGED`) so all hook instances reload when connection state changes (no manual refresh needed)
+- Removed legacy localStorage token fallback and `LinearSetup` component
+- Sidebar reads connection status from hooks instead of localStorage, shows both Linear and Figma under Integrations section
+- IntegrationsPage refactored to use both hooks, shows connected account name, disconnect button per integration
+- 401 auto-retry in `linear.ts` via `setOnUnauthorized` callback wired from the hook
+- Created Figma API module (`src/app/api/figma.ts`): types, file/comment endpoints, unread tracking, file key extraction
+- FigmaView: threaded comment UI with top-level thread list (comment preview, file name link, reply count) and chat view (chronological messages, reply input, "View in file" link)
+- Created `figma_comments` and `figma_webhooks` Supabase tables with RLS and GIN index on mentions
+- Webhook receive endpoint (`POST /server/figma/webhook`) stores incoming FILE_COMMENT events with passcode verification
+- Webhook register endpoint (`POST /server/figma/webhook/register`) registers with Figma API and stores webhook info
+- FigmaView reads comments from Supabase filtered by user's Figma ID (mentions or authored)
+- Unread badge on Figma sidebar item reads from `figma_comments` table, polls every 30s
+- Team setup screen with reference image for finding Figma team URL
+- Created test account (test@hierarch.app / Test2026) with Pro IC user metadata
+- Added `vercel.json` with SPA rewrite for OAuth callback routes
+- Renamed edge function files from `.tsx` to `.ts` and fixed import paths for Supabase deployment
+- Removed Add Task button from project page header
+- Set Supabase Edge Function secrets for LINEAR_CLIENT_ID, LINEAR_CLIENT_SECRET, FIGMA_CLIENT_ID, FIGMA_CLIENT_SECRET
+
+**Up next:**
+- Deploy edge function with Figma webhook routes and test the full comment flow
+- Build Insights view for phase analytics
+- Push all changes to GitHub
+- DataTable refactor
+- Continue light mode polish
+- Post-launch: list Figma app in Figma Community
+
+---
+
+## 2026-03-18 — Cost audit, Supabase Realtime planning
+
+Linear and Figma OAuth integrations are fully built. Cost audit completed: no overnight billing risk (Supabase Free plan, static Vite SPA on Vercel, all polling is client-side only). Priority for next session: replace Figma unread 30s polling with Supabase Realtime subscriptions, then deploy edge function for Figma webhooks and build Insights view.
+
+**Done this session:**
+- Full cost risk audit of Vercel and Supabase usage (no runaway process risk found)
+- Identified Figma unread polling (30s interval in `use-figma-unread.ts`) as optimization target
+- Identified Figma webhook endpoint as public with passcode-only validation (no rate limiting)
+- Planned migration from 30s polling to Supabase Realtime subscriptions for `figma_comments` table
+
+**Up next:**
+- **Priority:** Replace Figma unread 30s polling with Supabase Realtime subscription
+- Deploy edge function with Figma webhook routes
+- Build Insights view for phase analytics
+- Push all changes to GitHub
+- Add HMAC request signing to Figma webhook endpoint
+
+---

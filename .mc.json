@@ -3,5 +3,5 @@
   "status": "active",
   "stack": ["React", "TypeScript", "Tailwind CSS", "shadcn/ui", "Supabase"],
   "url": "https://hierarch.vercel.app",
-  "notes": "Light mode is fully themed with dynamic CSS variable tokens (shell, drawer, surface, attention) replacing all hardcoded dark-only colors. Phases renamed from Explore/Define/Refine/Feedback/Handoff to Explore/Design/Iterate/Review/Handoff with full DB migration support via LEGACY_STATUS_MAP. Blockers are now a first-class entity (task_blockers Supabase table with RLS) replacing the old waitingFor JSON blob, with full CRUD, dashboard integration, and lock icons on blocked tasks. Artifacts gained URL fields with previews (YouTube/Vimeo/Loom embeds, image previews, favicon cards) and inline link detection in the rich text editor. Next: deploy latest changes, fix any remaining light mode contrast issues, build Insights view."
+  "notes": "Linear and Figma OAuth integrations are fully built. Cost audit completed: no overnight billing risk (Supabase Free plan, static Vite SPA on Vercel, all polling is client-side only). Priority for next session: replace Figma unread 30s polling with Supabase Realtime subscriptions, then deploy edge function for Figma webhooks and build Insights view."
 }

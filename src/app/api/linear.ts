@@ -1,5 +1,12 @@
 const LINEAR_API = 'https://api.linear.app/graphql'
 
+// Optional refresh callback — set by useLinearToken hook
+let _onUnauthorized: (() => Promise<string | null>) | null = null
+
+export function setOnUnauthorized(fn: (() => Promise<string | null>) | null) {
+  _onUnauthorized = fn
+}
+
 async function gql<T>(token: string, query: string, variables?: Record<string, unknown>): Promise<T> {
   const res = await fetch(LINEAR_API, {
     method: 'POST',
@@ -9,6 +16,25 @@ async function gql<T>(token: string, query: string, variables?: Record<string, u
     },
     body: JSON.stringify({ query, variables }),
   })
+
+  // Handle expired OAuth tokens
+  if (res.status === 401 && _onUnauthorized) {
+    const newToken = await _onUnauthorized()
+    if (newToken) {
+      const retry = await fetch(LINEAR_API, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: newToken,
+        },
+        body: JSON.stringify({ query, variables }),
+      })
+      const retryJson = await retry.json()
+      if (retryJson.errors) throw new Error(retryJson.errors[0].message)
+      return retryJson.data as T
+    }
+  }
+
   const json = await res.json()
   if (json.errors) {
     console.error('Linear API errors:', JSON.stringify(json.errors, null, 2))

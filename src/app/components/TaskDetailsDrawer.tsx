@@ -271,7 +271,7 @@ export function TaskDetailsDrawer({
 
           {/* Phase */}
           <div className="space-y-1.5">
-            <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground/40">Phase</span>
+            <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground/40">Status</span>
             <Popover open={phaseOpen} onOpenChange={setPhaseOpen}>
               <PopoverTrigger asChild>
                 <button className={cn(
