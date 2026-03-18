@@ -81,7 +81,7 @@ export async function getFile(token: string, fileKey: string): Promise<FigmaFile
 // Extract file key from a Figma URL
 export function extractFileKey(url: string): string | null {
   const match = url.match(/figma\.com\/(?:file|design)\/([a-zA-Z0-9]+)/)
-  return match ? match[1] : null
+  return match?.[1] ?? null
 }
 
 // Stored file keys

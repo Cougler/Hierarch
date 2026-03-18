@@ -40,8 +40,9 @@ function buildThreads(comments: FigmaCommentRow[]): Thread[] {
 
   for (const c of comments) {
     if (c.parent_id) {
-      if (!repliesByParent[c.parent_id]) repliesByParent[c.parent_id] = []
-      repliesByParent[c.parent_id].push(c)
+      const pid = c.parent_id
+      if (!repliesByParent[pid]) repliesByParent[pid] = []
+      repliesByParent[pid]!.push(c)
     } else {
       roots.push(c)
     }
