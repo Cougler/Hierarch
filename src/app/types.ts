@@ -82,6 +82,7 @@ export interface ProjectMetadata {
   phase?: string;
   order?: number;
   blockers?: BlockerItem[];
+  phaseHistory?: PhaseTransition[];
   start_date?: string; // ISO date string
   end_date?: string;   // ISO date string
   [key: string]: unknown;
@@ -132,7 +133,7 @@ export const PROJECT_PHASES: StatusConfig[] = [
 export const DEFAULT_STATUSES: StatusConfig[] = [
   { id: 'todo', title: 'To Do', color: 'bg-slate-500', countColor: 'text-slate-400', order: 0, width: 280, visible: true },
   { id: 'in-progress', title: 'In Progress', color: 'bg-blue-500', countColor: 'text-blue-400', order: 1, width: 280, visible: true },
-  { id: 'feedback', title: 'Feedback', color: 'bg-orange-500', countColor: 'text-orange-400', order: 2, width: 280, visible: true, isFeedback: true },
+  { id: 'feedback', title: 'Review', color: 'bg-orange-500', countColor: 'text-orange-400', order: 2, width: 280, visible: true, isFeedback: true },
   { id: 'done', title: 'Done', color: 'bg-emerald-500', countColor: 'text-emerald-400', order: 3, width: 280, visible: true, isDone: true },
 ];
 

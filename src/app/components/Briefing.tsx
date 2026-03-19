@@ -1,5 +1,8 @@
-import { useMemo } from 'react'
-import { format, formatDistanceToNow, isToday, subDays, isBefore, startOfDay } from 'date-fns'
+import { useMemo, useState } from 'react'
+import { format, formatDistanceToNow as _fdtn, isToday, subDays, isBefore, startOfDay } from 'date-fns'
+
+const formatDistanceToNow: typeof _fdtn = (date, opts) =>
+  _fdtn(date, opts).replace(/^about /, '')
 import { motion, AnimatePresence } from 'motion/react'
 import { cn } from '@/app/lib/utils'
 import { Button } from '@/app/components/ui/button'
@@ -15,10 +18,16 @@ import {
   FolderPlus,
   ListPlus,
   ArrowRight,
+  Figma,
+  Trash2,
 } from 'lucide-react'
+import { PROJECT_PHASES } from '@/app/types'
 import type { Task, Project, StatusConfig, PhaseTransition } from '@/app/types'
 import type { Artifact } from '@/app/components/NoteDrawer'
 import { getIconComponent } from '@/app/components/IconPicker'
+import {
+  ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuTrigger,
+} from '@/app/components/ui/context-menu'
 
 const BG_TO_HEX: Record<string, string> = {
   'bg-violet-500': '#8b5cf6',
@@ -49,7 +58,7 @@ interface BriefingProps {
   onTaskClick: (task: Task) => void
   onTaskCreate: (task: Partial<Task>) => void
   onViewChange: (view: string) => void
-  onNewTask?: () => void
+  onStandupCreate?: (text: string) => void
   artifacts: Artifact[]
   onArtifactCreate: (projectId: string) => void
   onArtifactClick: (note: Artifact) => void
@@ -59,6 +68,9 @@ interface BriefingProps {
   onDrawerTaskClick?: (task: Task) => void
   onDrawerArtifactClick?: (artifact: Artifact) => void
   onProjectCreate?: () => void
+  recentLinearEvents?: { id: string; action: string; type: string; title: string; identifier: string; status_name: string; status_color: string; assignee_name: string; actor_name: string; url: string; created_at: string }[]
+  recentFigmaComments?: { id: string; message: string; file_name: string; figma_user_handle: string; created_at: string }[]
+  recentJiraEvents?: { id: string; action: string; type: string; title: string; identifier: string; status_name: string; status_color: string; assignee_name: string; actor_name: string; url: string; created_at: string }[]
 }
 
 function getTimeOfDay(): string {
@@ -78,6 +90,128 @@ function getPhaseTitle(phaseId: string, statuses: StatusConfig[]): string {
   return statuses.find(s => s.id === phaseId)?.title ?? phaseId
 }
 
+type ActivityItem =
+  | { type: 'phase'; timestamp: string; task: Task; transition: PhaseTransition; projectName?: string }
+  | { type: 'note-created'; timestamp: string; note: Artifact; projectName?: string }
+  | { type: 'note-edited'; timestamp: string; note: Artifact; projectName?: string }
+  | { type: 'project-created'; timestamp: string; project: Project }
+  | { type: 'task-created'; timestamp: string; task: Task; projectName?: string }
+  | { type: 'linear-event'; timestamp: string; event: { id: string; action: string; eventType: string; title: string; identifier: string; status_name: string; status_color: string; assignee_name: string; actor_name: string } }
+  | { type: 'jira-event'; timestamp: string; event: { id: string; action: string; eventType: string; title: string; identifier: string; status_name: string; status_color: string; assignee_name: string; actor_name: string } }
+  | { type: 'figma-comment'; timestamp: string; comment: { id: string; message: string; file_name: string; figma_user_handle: string } }
+
+function generateStandup(activity: ActivityItem[], projects: Project[], statuses: StatusConfig[]): string {
+  const sentences: string[] = []
+
+  // Collect sentences per project for grouping
+  const byProject = new Map<string, string[]>()
+  const general: string[] = []
+
+  for (const item of activity) {
+    if (item.type === 'phase') {
+      const toPhase = statuses.find(s => s.id === item.transition.toPhase)
+      const bucket = item.projectName || ''
+      const arr = byProject.get(bucket) || []
+
+      if (toPhase?.isFeedback) {
+        arr.push(`I sent "${item.task.title}" out for review.`)
+      } else if (toPhase?.isDone) {
+        arr.push(`I finished "${item.task.title}".`)
+      } else if (toPhase?.title?.toLowerCase().includes('progress')) {
+        arr.push(`I started working on "${item.task.title}".`)
+      } else {
+        arr.push(`I made progress on "${item.task.title}".`)
+      }
+      byProject.set(bucket, arr)
+    }
+
+    if (item.type === 'task-created') {
+      const bucket = item.projectName || ''
+      const arr = byProject.get(bucket) || []
+      arr.push(`I added "${item.task.title}" to the backlog.`)
+      byProject.set(bucket, arr)
+    }
+
+    if (item.type === 'note-created') {
+      const bucket = item.projectName || ''
+      const arr = byProject.get(bucket) || []
+      arr.push(item.note.title
+        ? `I wrote up notes on "${item.note.title}".`
+        : 'I wrote up some notes.')
+      byProject.set(bucket, arr)
+    }
+
+    if (item.type === 'note-edited') {
+      const bucket = item.projectName || ''
+      const arr = byProject.get(bucket) || []
+      arr.push(item.note.title
+        ? `I updated my notes on "${item.note.title}".`
+        : 'I updated some notes.')
+      byProject.set(bucket, arr)
+    }
+
+    if (item.type === 'project-created') {
+      general.push(`I kicked off a new project called "${item.project.name}".`)
+    }
+
+    if (item.type === 'linear-event') {
+      const evt = item.event
+      if (evt.eventType === 'Comment') {
+        general.push(`I got feedback from ${evt.actor_name || 'a teammate'} on "${evt.title}".`)
+      } else if (evt.action === 'create') {
+        general.push(`I created a new issue in Linear: "${evt.title}".`)
+      } else if (evt.status_name) {
+        general.push(`I moved "${evt.title}" to ${evt.status_name} in Linear.`)
+      }
+    }
+
+    if (item.type === 'jira-event') {
+      const evt = item.event
+      if (evt.eventType === 'Comment') {
+        general.push(`I got feedback from ${evt.actor_name || 'a teammate'} on "${evt.title}".`)
+      } else if (evt.action === 'created') {
+        general.push(`I created a new issue in Jira: "${evt.title}".`)
+      } else if (evt.status_name) {
+        general.push(`I moved "${evt.title}" to ${evt.status_name} in Jira.`)
+      }
+    }
+
+    if (item.type === 'figma-comment') {
+      general.push(`I got design feedback from ${item.comment.figma_user_handle} on ${item.comment.file_name}.`)
+    }
+  }
+
+  // Build the standup as HTML list grouped by project
+  const html: string[] = []
+
+  for (const [projectName, items] of byProject) {
+    const unique = [...new Set(items)]
+    if (projectName) {
+      html.push(`<p><strong>${projectName}</strong></p>`)
+    }
+    for (const line of unique) {
+      html.push(`<p>${line}</p>`)
+    }
+    html.push('<p><br></p>')
+  }
+
+  if (general.length > 0) {
+    const unique = [...new Set(general)]
+    for (const line of unique) {
+      html.push(`<p>${line}</p>`)
+    }
+  }
+
+  if (html.length === 0) {
+    return '<p>Nothing to report from the last 24 hours.</p>'
+  }
+
+  // Remove trailing empty paragraph
+  if (html[html.length - 1] === '<p><br></p>') html.pop()
+
+  return html.join('')
+}
+
 export function Briefing({
   tasks,
   projects,
@@ -86,7 +220,7 @@ export function Briefing({
   onTaskClick,
   onTaskCreate,
   onViewChange,
-  onNewTask,
+  onStandupCreate,
   artifacts,
   onArtifactCreate,
   onArtifactClick,
@@ -96,8 +230,26 @@ export function Briefing({
   onDrawerTaskClick,
   onDrawerArtifactClick,
   onProjectCreate,
+  recentLinearEvents = [],
+  recentFigmaComments = [],
+  recentJiraEvents = [],
 }: BriefingProps) {
   const firstName = userName.split(' ')[0]
+  const [dismissedItems, setDismissedItems] = useState<Set<string>>(() => {
+    try {
+      const saved = localStorage.getItem('hierarch-dismissed-activity')
+      return saved ? new Set(JSON.parse(saved)) : new Set()
+    } catch { return new Set() }
+  })
+
+  const dismissItem = (key: string) => {
+    setDismissedItems(prev => {
+      const next = new Set(prev)
+      next.add(key)
+      localStorage.setItem('hierarch-dismissed-activity', JSON.stringify([...next]))
+      return next
+    })
+  }
   const setPreviewProject = onPreviewProjectChange
   const statusMap = new Map(statuses.map(s => [s.id, s]))
   const doneStatuses = useMemo(
@@ -118,13 +270,6 @@ export function Briefing({
   }, [artifacts])
 
   // ─── Recent Activity (unified feed from last 48h) ───
-  type ActivityItem =
-    | { type: 'phase'; timestamp: string; task: Task; transition: PhaseTransition; projectName?: string }
-    | { type: 'note-created'; timestamp: string; note: Artifact; projectName?: string }
-    | { type: 'note-edited'; timestamp: string; note: Artifact; projectName?: string }
-    | { type: 'project-created'; timestamp: string; project: Project }
-    | { type: 'task-created'; timestamp: string; task: Task; projectName?: string }
-
   const recentActivity = useMemo(() => {
     const cutoff = subDays(new Date(), 2)
     const items: ActivityItem[] = []
@@ -167,8 +312,29 @@ export function Briefing({
       }
     }
 
+    // Linear webhook events
+    for (const event of recentLinearEvents) {
+      if (new Date(event.created_at) >= cutoff) {
+        items.push({ type: 'linear-event', timestamp: event.created_at, event: { ...event, eventType: event.type } })
+      }
+    }
+
+    // Jira webhook events
+    for (const event of recentJiraEvents) {
+      if (new Date(event.created_at) >= cutoff) {
+        items.push({ type: 'jira-event', timestamp: event.created_at, event: { ...event, eventType: event.type } })
+      }
+    }
+
+    // Figma comments
+    for (const comment of recentFigmaComments) {
+      if (new Date(comment.created_at) >= cutoff) {
+        items.push({ type: 'figma-comment', timestamp: comment.created_at, comment })
+      }
+    }
+
     return items.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
-  }, [tasks, projects, artifacts])
+  }, [tasks, projects, artifacts, recentLinearEvents, recentJiraEvents, recentFigmaComments])
 
   // ─── Active Projects (projects with non-done tasks, sorted by most recent activity) ───
   const activeProjects = useMemo(() => {
@@ -300,14 +466,17 @@ export function Briefing({
               </div>
             </div>
             <div className="flex items-center gap-2.5 shrink-0">
-              {onNewTask && (
+              {onStandupCreate && (
                 <Button
                   size="sm"
                   className="h-9 gap-2 text-xs bg-primary text-primary-foreground hover:bg-primary/90"
-                  onClick={onNewTask}
+                  onClick={() => {
+                    const text = generateStandup(recentActivity, projects, statuses)
+                    onStandupCreate(text)
+                  }}
                 >
-                  <Plus className="h-3.5 w-3.5" />
-                  Add task
+                  <FileText className="h-3.5 w-3.5" />
+                  Standup
                 </Button>
               )}
             </div>
@@ -473,7 +642,19 @@ export function Briefing({
               ) : (
                 <div className="flex-1 min-h-0 rounded-xl border border-border/30 bg-card/20 backdrop-blur-xl overflow-hidden">
                   <div className="h-full overflow-y-auto p-2 scrollbar-auto-hide">
-                    {recentActivity.map((item, idx) => {
+                    {recentActivity.map(item => {
+                      const itemKey = item.type === 'phase' ? `phase-${item.transition.id}`
+                        : item.type === 'task-created' ? `task-${item.task.id}`
+                        : item.type === 'note-created' ? `note-new-${item.note.id}`
+                        : item.type === 'note-edited' ? `note-edit-${item.note.id}-${item.timestamp}`
+                        : item.type === 'project-created' ? `proj-${item.project.id}`
+                        : item.type === 'linear-event' ? `linear-${item.event.id}`
+                        : item.type === 'jira-event' ? `jira-${item.event.id}`
+                        : item.type === 'figma-comment' ? `figma-${item.comment.id}`
+                        : `unknown-${(item as any).timestamp}`
+                      return { ...item, _key: itemKey }
+                    }).filter(item => !dismissedItems.has(item._key)).map((item) => {
+
                       if (item.type === 'phase') {
                         const isFeedbackTransition = statuses.find(s => s.id === item.transition.toPhase)?.isFeedback
                         const linkedNote = isFeedbackTransition
@@ -601,7 +782,110 @@ export function Briefing({
                         )
                       }
 
+                      if (item.type === 'linear-event') {
+                        const evt = item.event
+                        let reason = ''
+                        if (evt.eventType === 'Comment') reason = `Comment by ${evt.actor_name || 'someone'}`
+                        else if (evt.action === 'create') reason = 'Issue created'
+                        else if (evt.status_name) reason = `Changed to ${evt.status_name}`
+                        else if (evt.assignee_name) reason = `Assigned to ${evt.assignee_name}`
+                        else reason = 'Updated'
+                        return (
+                          <button
+                            key={`linear-${evt.id}`}
+                            onClick={() => onViewChange('linear')}
+                            className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-left transition-colors hover:bg-accent/50"
+                          >
+                            <img src="/linear.svg" alt="Linear" className="h-3.5 w-3.5 shrink-0 opacity-50 invert-on-light" />
+                            <div className="flex-1 min-w-0">
+                              <p className="text-xs text-foreground truncate">{evt.title}</p>
+                              <p className="text-[10px] text-muted-foreground mt-0.5">
+                                {reason}
+                                {evt.identifier && <span className="ml-1.5 text-muted-foreground/60">· {evt.identifier}</span>}
+                              </p>
+                            </div>
+                            <span className="text-xs text-muted-foreground/60 shrink-0">
+                              {formatDistanceToNow(new Date(item.timestamp), { addSuffix: true })}
+                            </span>
+                          </button>
+                        )
+                      }
+
+                      if (item.type === 'jira-event') {
+                        const evt = item.event
+                        let reason = ''
+                        if (evt.eventType === 'Comment') reason = `Comment by ${evt.actor_name || 'someone'}`
+                        else if (evt.action === 'created') reason = 'Issue created'
+                        else if (evt.status_name) reason = `Changed to ${evt.status_name}`
+                        else if (evt.assignee_name) reason = `Assigned to ${evt.assignee_name}`
+                        else reason = 'Updated'
+                        return (
+                          <button
+                            key={`jira-${evt.id}`}
+                            onClick={() => onViewChange('jira')}
+                            className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-left transition-colors hover:bg-accent/50"
+                          >
+                            <svg className="h-3.5 w-3.5 shrink-0 opacity-50" viewBox="0 0 24 24" fill="currentColor">
+                              <path d="M11.53 2c0 2.4 1.97 4.35 4.35 4.35h1.78v1.7c0 2.4 1.94 4.34 4.34 4.35V2.84a.84.84 0 0 0-.84-.84H11.53ZM6.77 6.8a4.36 4.36 0 0 0 4.34 4.34h1.8v1.72a4.36 4.36 0 0 0 4.34 4.34V7.63a.84.84 0 0 0-.84-.84H6.77ZM2 11.6a4.35 4.35 0 0 0 4.35 4.35h1.78v1.7c0 2.4 1.95 4.35 4.35 4.35v-9.56a.84.84 0 0 0-.84-.84H2Z" />
+                            </svg>
+                            <div className="flex-1 min-w-0">
+                              <p className="text-xs text-foreground truncate">{evt.title}</p>
+                              <p className="text-[10px] text-muted-foreground mt-0.5">
+                                {reason}
+                                {evt.identifier && <span className="ml-1.5 text-muted-foreground/60">· {evt.identifier}</span>}
+                              </p>
+                            </div>
+                            <span className="text-xs text-muted-foreground/60 shrink-0">
+                              {formatDistanceToNow(new Date(item.timestamp), { addSuffix: true })}
+                            </span>
+                          </button>
+                        )
+                      }
+
+                      if (item.type === 'figma-comment') {
+                        return (
+                          <button
+                            key={`figma-${item.comment.id}`}
+                            onClick={() => onViewChange('figma')}
+                            className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-left transition-colors hover:bg-accent/50"
+                          >
+                            <Figma className="h-3.5 w-3.5 shrink-0 opacity-50" />
+                            <div className="flex-1 min-w-0">
+                              <p className="text-xs text-foreground truncate">{item.comment.message}</p>
+                              <p className="text-[10px] text-muted-foreground mt-0.5">
+                                Comment from {item.comment.figma_user_handle}
+                                <span className="ml-1.5 text-muted-foreground/60">· {item.comment.file_name}</span>
+                              </p>
+                            </div>
+                            <span className="text-xs text-muted-foreground/60 shrink-0">
+                              {formatDistanceToNow(new Date(item.timestamp), { addSuffix: true })}
+                            </span>
+                          </button>
+                        )
+                      }
+
                       return null
+                    }).filter(Boolean).map((el, i) => {
+                      // Wrap each rendered item with a context menu for dismissal
+                      const key = (el as React.ReactElement)?.key || `activity-${i}`
+                      return (
+                        <ContextMenu key={`ctx-${key}`}>
+                          <ContextMenuTrigger asChild>
+                            {el}
+                          </ContextMenuTrigger>
+                          <ContextMenuContent>
+                            <ContextMenuItem
+                              onClick={() => {
+                                const k = typeof key === 'string' ? key : `activity-${i}`
+                                dismissItem(k)
+                              }}
+                              className="text-destructive"
+                            >
+                              <Trash2 className="mr-2 h-3.5 w-3.5" /> Remove from feed
+                            </ContextMenuItem>
+                          </ContextMenuContent>
+                        </ContextMenu>
+                      )
                     })}
                   </div>
                 </div>

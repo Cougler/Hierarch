@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { useLinearToken } from '@/app/hooks/use-linear-token';
 import { useFigmaToken } from '@/app/hooks/use-figma-token';
+import { useJiraToken } from '@/app/hooks/use-jira-token';
 import { useFigmaUnread } from '@/app/hooks/use-figma-unread';
 import { Figma } from 'lucide-react';
 
@@ -115,8 +116,9 @@ export function Sidebar({
   const realProjects = projects.filter(p => p.metadata?.type !== 'section');
   const { isConnected: hasLinear } = useLinearToken();
   const { isConnected: hasFigma } = useFigmaToken();
+  const { isConnected: hasJira } = useJiraToken();
   const figmaUnread = useFigmaUnread();
-  const hasAnyIntegration = hasLinear || hasFigma;
+  const hasAnyIntegration = hasLinear || hasFigma || hasJira;
 
   useEffect(() => {
     if (creatingProject) {
@@ -349,6 +351,22 @@ export function Sidebar({
               >
                 <img src="/linear.svg" alt="Linear" className="h-3.5 w-3.5 shrink-0 opacity-50 invert-on-light" />
                 <span className="flex-1 text-left">Linear</span>
+              </button>
+            )}
+            {hasJira && (
+              <button
+                onClick={() => { onViewChange('jira'); onClose?.(); }}
+                className={cn(
+                  'flex w-full items-center gap-3 rounded-md pl-1.5 pr-3 py-1.5 text-sm transition-colors',
+                  activeView === 'jira'
+                    ? 'bg-accent text-foreground font-medium'
+                    : 'text-foreground/60 hover:bg-accent/60 hover:text-foreground'
+                )}
+              >
+                <svg className="h-3.5 w-3.5 shrink-0 opacity-50" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M11.53 2c0 2.4 1.97 4.35 4.35 4.35h1.78v1.7c0 2.4 1.94 4.34 4.34 4.35V2.84a.84.84 0 0 0-.84-.84H11.53ZM6.77 6.8a4.36 4.36 0 0 0 4.34 4.34h1.8v1.72a4.36 4.36 0 0 0 4.34 4.34V7.63a.84.84 0 0 0-.84-.84H6.77ZM2 11.6a4.35 4.35 0 0 0 4.35 4.35h1.78v1.7c0 2.4 1.95 4.35 4.35 4.35v-9.56a.84.84 0 0 0-.84-.84H2Z" />
+                </svg>
+                <span className="flex-1 text-left">Jira</span>
               </button>
             )}
             {hasFigma && (

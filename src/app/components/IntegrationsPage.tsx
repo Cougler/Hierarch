@@ -4,6 +4,7 @@ import { toast } from 'sonner';
 import { cn } from '@/app/lib/utils';
 import { useLinearToken } from '@/app/hooks/use-linear-token';
 import { useFigmaToken } from '@/app/hooks/use-figma-token';
+import { useJiraToken } from '@/app/hooks/use-jira-token';
 
 interface IntegrationsPageProps {
   onViewChange: (view: string) => void;
@@ -12,6 +13,7 @@ interface IntegrationsPageProps {
 export function IntegrationsPage({ onViewChange }: IntegrationsPageProps) {
   const linear = useLinearToken();
   const figma = useFigmaToken();
+  const jira = useJiraToken();
   const [connectingId, setConnectingId] = useState<string | null>(null);
 
   const handleConnect = async (id: string, startOAuth: () => Promise<void>) => {
@@ -63,12 +65,14 @@ export function IntegrationsPage({ onViewChange }: IntegrationsPageProps) {
     {
       id: 'jira',
       name: 'Jira',
-      description: 'Pull in Jira issues and keep design tasks in sync.',
+      description: jira.isConnected && jira.viewer
+        ? `Connected as ${jira.viewer.name}`
+        : 'Pull in Jira issues and keep design tasks in sync.',
       icon: <svg className="h-5 w-5" viewBox="0 0 24 24" fill="currentColor"><path d="M11.53 2c0 2.4 1.97 4.35 4.35 4.35h1.78v1.7c0 2.4 1.94 4.34 4.34 4.35V2.84a.84.84 0 0 0-.84-.84H11.53ZM6.77 6.8a4.36 4.36 0 0 0 4.34 4.34h1.8v1.72a4.36 4.36 0 0 0 4.34 4.34V7.63a.84.84 0 0 0-.84-.84H6.77ZM2 11.6a4.35 4.35 0 0 0 4.35 4.35h1.78v1.7c0 2.4 1.95 4.35 4.35 4.35v-9.56a.84.84 0 0 0-.84-.84H2Z" /></svg>,
-      connected: false,
-      loading: false,
-      comingSoon: true,
-      onClick: () => {},
+      connected: jira.isConnected,
+      loading: jira.isLoading,
+      onClick: () => jira.isConnected ? onViewChange('jira') : handleConnect('jira', jira.startOAuth),
+      onDisconnect: (e: React.MouseEvent) => handleDisconnect(e, 'Jira', jira.disconnect),
     },
     {
       id: 'slack',

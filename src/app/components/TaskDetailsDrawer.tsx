@@ -274,14 +274,10 @@ export function TaskDetailsDrawer({
             <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground/40">Status</span>
             <Popover open={phaseOpen} onOpenChange={setPhaseOpen}>
               <PopoverTrigger asChild>
-                <button className={cn(
-                  'flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium transition-colors',
-                  phaseStyle.bg, phaseStyle.color,
-                  'hover:brightness-110',
-                )}>
-                  <span className={cn('h-1.5 w-1.5 rounded-full shrink-0', currentStatus?.color ?? 'bg-muted-foreground')} />
-                  {currentStatus?.title ?? 'No phase'}
-                  <ChevronDown className="h-2.5 w-2.5 opacity-60" />
+                <button className="flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-xs font-medium bg-surface hover:bg-surface-hover transition-colors">
+                  <span className={cn('h-2 w-2 rounded-full shrink-0', currentStatus?.color ?? 'bg-muted-foreground')} />
+                  {currentStatus?.title ?? 'No status'}
+                  <ChevronDown className="h-2.5 w-2.5 opacity-40" />
                 </button>
               </PopoverTrigger>
               <PopoverContent align="start" className="w-[240px] p-1.5" sideOffset={4}>
@@ -289,7 +285,6 @@ export function TaskDetailsDrawer({
                   {statuses.map(s => {
                     const norm = (v: string) => v.toLowerCase().replace(/[\s-]+/g, '');
                     const isActive = norm(task.status ?? '') === norm(s.id);
-                    const style = getPhaseStyle(s.id);
                     return (
                       <button
                         key={s.id}
@@ -297,7 +292,7 @@ export function TaskDetailsDrawer({
                         className={cn(
                           'flex items-center gap-2.5 rounded-lg px-3 py-2.5 text-xs transition-colors',
                           isActive
-                            ? cn(style.bg, style.color, 'font-medium')
+                            ? 'bg-accent/50 text-foreground font-medium'
                             : 'text-muted-foreground hover:bg-surface hover:text-foreground',
                         )}
                       >

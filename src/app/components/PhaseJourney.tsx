@@ -66,7 +66,7 @@ export function PhaseJourney({ phaseHistory, statuses, currentPhase, maxItems = 
         if (isDone) {
           label = `Handed off`
         } else if (isFeedback) {
-          label = `Moved to feedback`
+          label = `Moved to review`
         } else {
           label = `Moved to ${toPhase?.title ?? transition.toPhase}`
         }

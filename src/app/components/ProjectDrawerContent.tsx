@@ -28,7 +28,7 @@ interface ProjectDrawerContentProps {
   artifacts: Artifact[];
   onTaskClick: (task: Task) => void;
   onArtifactClick: (artifact: Artifact) => void;
-  onArtifactCreate: (projectId: string) => void;
+  onArtifactCreate: (projectId: string, type?: string) => void;
   onProjectUpdate?: (id: string, updates: Partial<Project>) => void;
   onViewChange: (view: string) => void;
   onClose: () => void;
@@ -113,6 +113,9 @@ export function ProjectDrawerContent({
 
   const handlePhaseChange = (phaseId: string) => {
     onProjectUpdate?.(project.id, { metadata: { ...project.metadata, phase: phaseId } });
+    if (phaseId === 'review') {
+      onArtifactCreate(project.id, 'feedback');
+    }
   };
 
   const handleDescriptionBlur = () => {
@@ -138,26 +141,16 @@ export function ProjectDrawerContent({
             <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground/40">Phase</span>
             <Popover open={phaseOpen} onOpenChange={setPhaseOpen}>
               <PopoverTrigger asChild>
-                <button className={cn(
-                  'flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium transition-colors',
-                  currentPhase
-                    ? cn(
-                        PHASE_COLORS[currentPhase.id]?.bg ?? 'bg-muted/30',
-                        PHASE_COLORS[currentPhase.id]?.color ?? 'text-muted-foreground',
-                      )
-                    : 'bg-muted/30 text-muted-foreground',
-                  'hover:brightness-110',
-                )}>
-                  <span className={cn('h-1.5 w-1.5 rounded-full shrink-0', currentPhase?.color ?? 'bg-muted-foreground')} />
+                <button className="flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-xs font-medium bg-surface hover:bg-surface-hover transition-colors">
+                  <span className={cn('h-2 w-2 rounded-full shrink-0', currentPhase?.color ?? 'bg-muted-foreground')} />
                   {currentPhase?.title ?? 'Set phase'}
-                  <ChevronDown className="h-2.5 w-2.5 opacity-60" />
+                  <ChevronDown className="h-2.5 w-2.5 opacity-40" />
                 </button>
               </PopoverTrigger>
               <PopoverContent align="start" className="w-[240px] p-1.5" sideOffset={4}>
                 <div className="grid grid-cols-2 gap-0.5">
                   {PROJECT_PHASES.map(p => {
                     const isActive = project.metadata?.phase === p.id;
-                    const colors = PHASE_COLORS[p.id];
                     return (
                       <button
                         key={p.id}
@@ -165,7 +158,7 @@ export function ProjectDrawerContent({
                         className={cn(
                           'flex items-center gap-2.5 rounded-lg px-3 py-2.5 text-xs transition-colors',
                           isActive
-                            ? cn(colors?.bg, colors?.color, 'font-medium')
+                            ? 'bg-accent/50 text-foreground font-medium'
                             : 'text-muted-foreground hover:bg-surface hover:text-foreground',
                         )}
                       >

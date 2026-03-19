@@ -550,3 +550,44 @@ Linear and Figma OAuth integrations are fully built. Cost audit completed: no ov
 - Add HMAC request signing to Figma webhook endpoint
 
 ---
+
+## 2026-03-18 — Linear webhooks, Recent Progress event ledger, unified UI components
+
+The Overview page has a full-height Recent Progress panel that shows an immutable event ledger from Linear webhooks (via Supabase Realtime), local task/project activity, and Figma comments. Linear webhook pipeline is live: edge function receives events, stores them in `linear_events` table, and the client auto-updates via Supabase Realtime subscriptions. This session also unified all status/phase selectors, redesigned the Linear issue drawer to use the standard floating drawer shell, added assignee picker and team members API, renamed task Feedback status to Review, and polished the Briefing layout. Next: Jira integration (same webhook pattern), re-enable Linear webhook signature verification, and submit Figma app for review.
+
+**Done this session:**
+- Redesigned Linear issue drawer to use standard floating drawer shell (matches UnifiedDrawer)
+- Stripped Hierarch-specific features from Linear drawer (keep only Linear data + Figma sync)
+- Added linkified URLs, video embeds (YouTube/Vimeo/Loom), and Figma thumbnail previews in issue descriptions
+- Added `getTeamMembers` API and assignee picker using `PickerPopover` component
+- Unified all status/phase selectors across task drawer, project drawer, and Linear drawer (rounded-lg bg-surface trigger, bg-accent/50 active state)
+- Renamed task "Feedback" status to "Review" (id stays `feedback` for backwards compat, forced localStorage refresh)
+- Updated artifact type switcher to match unified selector design
+- Fixed rich text editor: paragraph 12px, h3 14px, h2 18px, h1 24px; fixed `formatBlock` to wrap tags in angle brackets
+- Auto-create feedback artifact when project enters "review" phase
+- Added project phase change tracking (`phaseHistory` in ProjectMetadata) and display in Recent Progress
+- Moved Recent Progress panel outside padded content area, flush to right edge, full height with border-l
+- Removed "Add task" button from Overview header
+- Extended Recent Progress cutoff from 2 days to 7 days; added `createdAt` to new task creation
+- Built Linear webhook pipeline: `linear_events` Supabase table with Realtime, edge function `POST /linear/webhook`, HMAC signature verification (temporarily disabled for debugging)
+- Edge function deployed with `--no-verify-jwt` to allow Linear webhook POSTs
+- Switched Recent Progress Linear feed from issue snapshots to immutable event ledger (reads from `linear_events` table)
+- LinearView auto-refreshes via Supabase Realtime subscription on `linear_events`
+- Added Figma comments and Linear events to Recent Progress feed with contextual subtext
+- Added 15-day cleanup cron job for `linear_events` table (pg_cron, runs 3am UTC daily)
+- Polished active projects: subtle bg treatment, anglearrow.svg for nested tasks, 16px gap between projects
+- Adjusted sidebar item left padding to pl-1.5
+- Gated Figma integration behind "Coming Soon" on production (pending Figma app review)
+- Exported `PickerPopover` from TaskDetailsDrawer for reuse
+- Fixed `previewProject` stale state bug (project phase changes now sync to drawer)
+- Priority bars replace "P4" text in Linear issues table, priority column moved to left of ID
+
+**Up next:**
+- Jira integration (same webhook-based pattern as Linear)
+- Re-enable Linear webhook HMAC signature verification (currently disabled)
+- Submit Figma app for review to enable production OAuth
+- Replace Figma unread 30s polling with Supabase Realtime
+- Build Insights view for phase analytics
+- Push all changes to GitHub
+
+---

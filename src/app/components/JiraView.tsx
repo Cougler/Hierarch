@@ -5,7 +5,7 @@ import { motion } from 'motion/react'
 import { toast } from 'sonner'
 import {
   ExternalLink, Figma, Plus, RefreshCw, ChevronDown,
-  Link2, AlertCircle, X, Check, Loader2, Layers, Video,
+  Link2, X, Loader2, Layers, Video,
 } from 'lucide-react'
 import { Button } from './ui/button'
 import { Input } from './ui/input'
@@ -18,17 +18,15 @@ import {
 } from './ui/dialog'
 import { Popover, PopoverContent, PopoverTrigger } from './ui/popover'
 import { PickerPopover } from './TaskDetailsDrawer'
-import {
-  Sheet, SheetContent, SheetHeader, SheetTitle,
-} from './ui/sheet'
 import { AnimatePresence } from 'motion/react'
 import { Separator } from './ui/separator'
 import { cn } from '../lib/utils'
-import * as linearApi from '../api/linear'
-import type { LinearIssue, LinearTeam, LinearStatus, DesignMeta } from '../api/linear'
-import { useLinearToken } from '../hooks/use-linear-token'
+import * as jiraApi from '../api/jira'
+import type { JiraIssue, JiraProject, JiraStatus, JiraTransition, JiraUser, DesignMeta } from '../api/jira'
+import { useJiraToken } from '../hooks/use-jira-token'
 
-const TEAM_KEY = 'hierarch-linear-team'
+const PROJECT_KEY = 'hierarch-jira-project'
+const JIRA_BLUE = '#0052CC'
 
 // ── Figma preview helper ─────────────────────────────────────────────────────
 
@@ -101,7 +99,6 @@ function Linkify({ text }: { text: string }) {
   const videoEmbeds: { embed: string; provider: string }[] = []
   const figmaUrls: string[] = []
 
-  // Collect rich previews from URLs in the text
   for (const part of parts) {
     if (URL_REGEX.test(part)) {
       const embed = getVideoEmbed(part)
@@ -114,15 +111,7 @@ function Linkify({ text }: { text: string }) {
     <>
       {parts.map((part, i) =>
         URL_REGEX.test(part) ? (
-          <a
-            key={i}
-            href={part}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-primary hover:underline break-all"
-          >
-            {part}
-          </a>
+          <a key={i} href={part} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline break-all">{part}</a>
         ) : (
           <span key={i}>{part}</span>
         )
@@ -131,13 +120,7 @@ function Linkify({ text }: { text: string }) {
         <div className="mt-3 space-y-3">
           {videoEmbeds.map((embed, i) => (
             <div key={`video-${i}`} className="rounded-lg overflow-hidden border border-border">
-              <iframe
-                src={embed.embed}
-                title={embed.provider}
-                className="w-full aspect-video"
-                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                allowFullScreen
-              />
+              <iframe src={embed.embed} title={embed.provider} className="w-full aspect-video" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen />
               <div className="flex items-center gap-1.5 px-3 py-2 bg-accent/50 text-xs text-muted-foreground/60">
                 <Video className="h-3 w-3" />
                 {embed.provider}
@@ -155,21 +138,18 @@ function Linkify({ text }: { text: string }) {
 
 // ── Priority Badge ──────────────────────────────────────────────────────────
 
-function PriorityDot({ priority }: { priority: number }) {
-  if (priority === 0) return null
-  // Priority 1 = Urgent (4 bars), 2 = High (3), 3 = Medium (2), 4 = Low (1)
-  const filledBars = 5 - priority
-  const entry = linearApi.PRIORITY_LABELS[priority] ?? linearApi.PRIORITY_LABELS[0]
-  const color = entry?.color ?? 'text-muted-foreground'
+function PriorityDot({ priorityId }: { priorityId?: string }) {
+  if (!priorityId) return null
+  const entry = jiraApi.PRIORITY_LABELS[priorityId]
+  if (!entry) return null
+  const filled = 6 - Number(priorityId)
+  const color = entry.color
   return (
-    <span className={cn('inline-flex items-end gap-[2px]', color)} title={entry?.label}>
+    <span className={cn('inline-flex items-end gap-[2px]', color)} title={entry.label}>
       {[1, 2, 3].map(bar => (
         <span
           key={bar}
-          className={cn(
-            'w-[3px] rounded-sm',
-            bar <= filledBars ? 'bg-current' : 'bg-current opacity-20'
-          )}
+          className={cn('w-[3px] rounded-sm', bar <= filled ? 'bg-current' : 'bg-current opacity-20')}
           style={{ height: `${8 + (bar - 1) * 3}px` }}
         />
       ))}
@@ -177,77 +157,66 @@ function PriorityDot({ priority }: { priority: number }) {
   )
 }
 
+// ── Status color helper ─────────────────────────────────────────────────────
+
+function statusColor(status: JiraStatus): string {
+  return jiraApi.STATUS_CATEGORY_COLORS[status.statusCategory?.key] ?? '#94a3b8'
+}
+
+// ── Jira SVG Icon ───────────────────────────────────────────────────────────
+
+function JiraIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="currentColor">
+      <path d="M11.53 2c0 2.4 1.97 4.35 4.35 4.35h1.78v1.7c0 2.4 1.94 4.34 4.34 4.35V2.84a.84.84 0 0 0-.84-.84H11.53ZM6.77 6.8a4.36 4.36 0 0 0 4.34 4.34h1.8v1.72a4.36 4.36 0 0 0 4.34 4.34V7.63a.84.84 0 0 0-.84-.84H6.77ZM2 11.6a4.35 4.35 0 0 0 4.35 4.35h1.78v1.7c0 2.4 1.95 4.35 4.35 4.35v-9.56a.84.84 0 0 0-.84-.84H2Z" />
+    </svg>
+  )
+}
+
 // ── Issue Detail Drawer ─────────────────────────────────────────────────────
 
 function IssueDrawer({
   issue,
-  statuses,
   members,
   token,
+  cloudId,
   onClose,
   onUpdate,
 }: {
-  issue: LinearIssue
-  statuses: LinearStatus[]
-  members: linearApi.LinearUser[]
+  issue: JiraIssue
+  members: JiraUser[]
   token: string
+  cloudId: string
   onClose: () => void
-  onUpdate: (updated: LinearIssue) => void
+  onUpdate: (updated: JiraIssue) => void
 }) {
   const [saving, setSaving] = useState(false)
   const [statusOpen, setStatusOpen] = useState(false)
   const [assigneeOpen, setAssigneeOpen] = useState(false)
-  const [attachments, setAttachments] = useState<{ id: string; url: string; title: string }[]>([])
+  const [transitions, setTransitions] = useState<JiraTransition[]>([])
   const [figmaUrl, setFigmaUrl] = useState('')
-  const [figmaAttachmentId, setFigmaAttachmentId] = useState<string | null>(null)
 
-  // Load attachments from Linear
+  // Load available transitions
   useEffect(() => {
-    linearApi.getAttachments(token, issue.id)
-      .then(atts => {
-        setAttachments(atts)
-        const figma = atts.find(a => a.url.includes('figma.com'))
-        if (figma) {
-          setFigmaUrl(figma.url)
-          setFigmaAttachmentId(figma.id)
-        }
-      })
+    jiraApi.getTransitions(token, cloudId, issue.key)
+      .then(setTransitions)
       .catch(() => {})
-  }, [issue.id, token])
+  }, [issue.key, token, cloudId])
 
-  const syncFigmaToLinear = async () => {
-    const url = figmaUrl.trim()
-    if (!url) {
-      if (figmaAttachmentId) {
-        try {
-          await linearApi.deleteAttachment(token, figmaAttachmentId)
-          setFigmaAttachmentId(null)
-          setAttachments(prev => prev.filter(a => a.id !== figmaAttachmentId))
-        } catch { /* ignore */ }
-      }
-      return
-    }
-    try {
-      if (figmaAttachmentId) {
-        await linearApi.deleteAttachment(token, figmaAttachmentId).catch(() => {})
-      }
-      const attachment = await linearApi.createAttachment(token, issue.id, url, 'Figma Design')
-      setFigmaAttachmentId(attachment.id)
-      setAttachments(prev => [
-        ...prev.filter(a => a.id !== figmaAttachmentId),
-        { id: attachment.id, url, title: 'Figma Design' },
-      ])
-      toast.success('Figma link synced to Linear')
-    } catch {
-      toast.error('Failed to sync Figma link to Linear')
-    }
-  }
+  // Load design meta
+  useEffect(() => {
+    const meta = jiraApi.getDesignMeta(issue.key)
+    if (meta.figmaUrl) setFigmaUrl(meta.figmaUrl)
+  }, [issue.key])
 
-  const handleStatusChange = async (statusId: string) => {
+  const handleTransition = async (transitionId: string) => {
     setSaving(true)
     try {
-      const updated = await linearApi.updateIssue(token, issue.id, { stateId: statusId })
+      await jiraApi.transitionIssue(token, cloudId, issue.key, transitionId)
+      const updated = await jiraApi.getIssue(token, cloudId, issue.key)
       onUpdate(updated)
+      // Reload transitions for new state
+      jiraApi.getTransitions(token, cloudId, issue.key).then(setTransitions).catch(() => {})
       toast.success('Status updated')
     } catch {
       toast.error('Failed to update status')
@@ -256,10 +225,13 @@ function IssueDrawer({
     }
   }
 
-  const handleAssigneeChange = async (userId: string) => {
+  const handleAssigneeChange = async (accountId: string) => {
     setSaving(true)
     try {
-      const updated = await linearApi.updateIssue(token, issue.id, { assigneeId: userId })
+      await jiraApi.updateIssue(token, cloudId, issue.key, {
+        assignee: { accountId },
+      })
+      const updated = await jiraApi.getIssue(token, cloudId, issue.key)
       onUpdate(updated)
       toast.success('Assignee updated')
     } catch {
@@ -269,14 +241,26 @@ function IssueDrawer({
     }
   }
 
-  const priorityEntry = linearApi.PRIORITY_LABELS[issue.priority]
-  const memberItems = members.map(m => ({ id: m.id, label: m.name, secondary: m.email }))
+  const saveFigmaUrl = () => {
+    jiraApi.saveDesignMeta(issue.key, { ...jiraApi.getDesignMeta(issue.key), figmaUrl: figmaUrl.trim() || undefined })
+  }
+
+  const priorityEntry = issue.fields.priority ? jiraApi.PRIORITY_LABELS[issue.fields.priority.id] : null
+  const memberItems = members.map(m => ({ id: m.accountId, label: m.displayName, secondary: m.emailAddress }))
+  const issueUrl = `https://${cloudId}.atlassian.net/browse/${issue.key}`
+
+  // Extract description text (Jira ADF or plain string)
+  const descriptionText = typeof issue.fields.description === 'string'
+    ? issue.fields.description
+    : issue.fields.description?.content
+      ?.flatMap((block: any) => block.content?.map((c: any) => c.text).filter(Boolean) ?? [])
+      .join('\n') ?? ''
 
   return (
     <AnimatePresence>
       {/* Floating close button */}
       <motion.button
-        key="linear-drawer-close"
+        key="jira-drawer-close"
         initial={{ opacity: 0, x: 40 }}
         animate={{ opacity: 0.85, x: 0 }}
         exit={{ opacity: 0, x: 40, transition: { type: 'spring', stiffness: 420, damping: 32, mass: 0.7 } }}
@@ -290,7 +274,7 @@ function IssueDrawer({
 
       {/* Drawer shell */}
       <motion.div
-        key="linear-drawer"
+        key="jira-drawer"
         initial={{ opacity: 0, scale: 0.88 }}
         animate={{ opacity: 1, scale: 1 }}
         exit={{ opacity: 0, scale: 0.88 }}
@@ -300,23 +284,23 @@ function IssueDrawer({
       >
         {/* Navigation bar */}
         <div className="shrink-0 flex items-center gap-2 px-4 pt-4 pb-2">
-          <span className="text-[10px] font-medium uppercase tracking-widest text-muted-foreground">Linear Issue</span>
+          <span className="text-[10px] font-medium uppercase tracking-widest text-muted-foreground">Jira Issue</span>
         </div>
 
         {/* Header */}
         <div className="px-6 pb-4 border-b border-border">
           <div className="flex items-center justify-between gap-2 mb-2">
-            <span className="text-xs font-mono text-muted-foreground">{issue.identifier}</span>
+            <span className="text-xs font-mono text-muted-foreground">{issue.key}</span>
             <div className="flex items-center gap-2">
               {saving && <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />}
-              <a href={issue.url} target="_blank" rel="noopener noreferrer">
+              <a href={issueUrl} target="_blank" rel="noopener noreferrer">
                 <Button variant="ghost" size="icon" className="h-7 w-7">
                   <ExternalLink className="h-3.5 w-3.5" />
                 </Button>
               </a>
             </div>
           </div>
-          <h2 className="text-base font-semibold">{issue.title}</h2>
+          <h2 className="text-base font-semibold">{issue.fields.summary}</h2>
         </div>
 
         <ScrollArea className="flex-1">
@@ -324,7 +308,7 @@ function IssueDrawer({
 
             {/* Status + Priority + Assignee row */}
             <div className="flex flex-wrap gap-4">
-              {/* Status picker */}
+              {/* Status picker (transitions) */}
               <div>
                 <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide block mb-2">Status</label>
                 <Popover open={statusOpen} onOpenChange={setStatusOpen}>
@@ -332,41 +316,42 @@ function IssueDrawer({
                     <button className="flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-xs font-medium bg-surface hover:bg-surface-hover transition-colors">
                       <span
                         className="w-2 h-2 rounded-full shrink-0"
-                        style={{ background: issue.status.color }}
+                        style={{ background: statusColor(issue.fields.status) }}
                       />
-                      {issue.status.name}
+                      {issue.fields.status.name}
                       <ChevronDown className="h-2.5 w-2.5 opacity-40" />
                     </button>
                   </PopoverTrigger>
                   <PopoverContent align="start" className="w-[240px] p-1.5" sideOffset={4}>
                     <div className="grid grid-cols-2 gap-0.5">
-                      {statuses.map(s => (
+                      {transitions.map(t => (
                         <button
-                          key={s.id}
-                          onClick={() => { handleStatusChange(s.id); setStatusOpen(false) }}
+                          key={t.id}
+                          onClick={() => { handleTransition(t.id); setStatusOpen(false) }}
                           className={cn(
                             'flex items-center gap-2.5 rounded-lg px-3 py-2.5 text-xs transition-colors',
-                            issue.status.id === s.id
-                              ? 'bg-accent/50 text-foreground font-medium'
-                              : 'text-muted-foreground hover:bg-surface hover:text-foreground',
+                            'text-muted-foreground hover:bg-surface hover:text-foreground',
                           )}
                         >
-                          <span className="h-2 w-2 rounded-full shrink-0" style={{ background: s.color }} />
-                          {s.name}
+                          <span className="h-2 w-2 rounded-full shrink-0" style={{ background: statusColor(t.to) }} />
+                          {t.name}
                         </button>
                       ))}
                     </div>
+                    {transitions.length === 0 && (
+                      <p className="text-xs text-muted-foreground/50 text-center py-3">No transitions available</p>
+                    )}
                   </PopoverContent>
                 </Popover>
               </div>
 
               {/* Priority */}
-              {issue.priority > 0 && (
+              {issue.fields.priority && priorityEntry && (
                 <div>
                   <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide block mb-2">Priority</label>
                   <div className="flex items-center gap-2 h-8">
-                    <PriorityDot priority={issue.priority} />
-                    <span className={cn('text-xs font-medium', priorityEntry?.color)}>{priorityEntry?.label}</span>
+                    <PriorityDot priorityId={issue.fields.priority.id} />
+                    <span className={cn('text-xs font-medium', priorityEntry.color)}>{priorityEntry.label}</span>
                   </div>
                 </div>
               )}
@@ -379,16 +364,16 @@ function IssueDrawer({
                   onOpenChange={setAssigneeOpen}
                   trigger={
                     <button className="flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-xs bg-surface hover:bg-surface-hover transition-colors">
-                      {issue.assignee ? (
+                      {issue.fields.assignee ? (
                         <>
-                          {issue.assignee.avatarUrl ? (
-                            <img src={issue.assignee.avatarUrl} className="w-4 h-4 rounded-full" alt="" />
+                          {issue.fields.assignee.avatarUrls?.['24x24'] ? (
+                            <img src={issue.fields.assignee.avatarUrls['24x24']} className="w-4 h-4 rounded-full" alt="" />
                           ) : (
-                            <div className="w-4 h-4 rounded-full bg-[#5E6AD2]/20 flex items-center justify-center text-[8px] font-semibold text-[#5E6AD2]">
-                              {issue.assignee.name[0]}
+                            <div className="w-4 h-4 rounded-full bg-[#0052CC]/20 flex items-center justify-center text-[8px] font-semibold text-[#0052CC]">
+                              {issue.fields.assignee.displayName[0]}
                             </div>
                           )}
-                          <span className="font-medium">{issue.assignee.name}</span>
+                          <span className="font-medium">{issue.fields.assignee.displayName}</span>
                         </>
                       ) : (
                         <span className="text-muted-foreground/40">Unassigned</span>
@@ -397,7 +382,7 @@ function IssueDrawer({
                     </button>
                   }
                   items={memberItems}
-                  selectedId={issue.assignee?.id}
+                  selectedId={issue.fields.assignee?.accountId}
                   onSelect={handleAssigneeChange}
                   placeholder="Search members…"
                   emptyLabel="No members found"
@@ -406,24 +391,18 @@ function IssueDrawer({
             </div>
 
             {/* Labels */}
-            {issue.labels.length > 0 && (
+            {issue.fields.labels && issue.fields.labels.length > 0 && (
               <div>
                 <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide block mb-2">Labels</label>
                 <div className="flex gap-1.5 flex-wrap">
-                  {issue.labels.map(l => (
-                    <span
-                      key={l.id}
-                      className="text-xs px-2 py-0.5 rounded-full"
-                      style={{ background: `${l.color}22`, color: l.color }}
-                    >
-                      {l.name}
-                    </span>
+                  {issue.fields.labels.map(l => (
+                    <span key={l} className="text-xs px-2 py-0.5 rounded-full bg-accent text-muted-foreground">{l}</span>
                   ))}
                 </div>
               </div>
             )}
 
-            {/* Figma Link (syncs to Linear as attachment) */}
+            {/* Figma Link */}
             <Separator />
             <div>
               <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide block mb-2">
@@ -435,7 +414,7 @@ function IssueDrawer({
                   placeholder="https://figma.com/file/…"
                   value={figmaUrl}
                   onChange={e => setFigmaUrl(e.target.value)}
-                  onBlur={syncFigmaToLinear}
+                  onBlur={saveFigmaUrl}
                   className="text-sm font-mono"
                 />
                 {figmaUrl && (
@@ -454,43 +433,12 @@ function IssueDrawer({
             </div>
 
             {/* Description */}
-            {issue.description && (
+            {descriptionText && (
               <>
                 <Separator />
                 <div>
                   <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide block mb-2">Description</label>
-                  <p className="text-sm text-muted-foreground whitespace-pre-wrap"><Linkify text={issue.description} /></p>
-                </div>
-              </>
-            )}
-
-            {/* Attachments from Linear (Figma previews, etc.) */}
-            {attachments.length > 0 && (
-              <>
-                <Separator />
-                <div>
-                  <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide block mb-2">Attachments</label>
-                  <div className="space-y-3">
-                    {attachments.map(att => {
-                      const isFigma = att.url.includes('figma.com')
-                      if (isFigma && FIGMA_URL_REGEX.test(att.url)) {
-                        return <FigmaPreview key={att.id} url={att.url} />
-                      }
-                      return (
-                        <a
-                          key={att.id}
-                          href={att.url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="flex items-center gap-2 px-3 py-2.5 rounded-lg border border-border bg-accent/30 text-sm text-foreground/80 hover:bg-accent/50 transition-colors"
-                        >
-                          <Link2 className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-                          <span className="flex-1 truncate">{att.title || att.url}</span>
-                          <ExternalLink className="h-3 w-3 shrink-0 text-muted-foreground/50" />
-                        </a>
-                      )
-                    })}
-                  </div>
+                  <p className="text-sm text-muted-foreground whitespace-pre-wrap"><Linkify text={descriptionText} /></p>
                 </div>
               </>
             )}
@@ -504,43 +452,36 @@ function IssueDrawer({
 // ── Create Issue Dialog ─────────────────────────────────────────────────────
 
 function CreateIssueDialog({
-  statuses,
   token,
-  teamId,
+  cloudId,
+  projectKey,
   onClose,
   onCreate,
 }: {
-  statuses: LinearStatus[]
   token: string
-  teamId: string
+  cloudId: string
+  projectKey: string
   onClose: () => void
-  onCreate: (issue: LinearIssue) => void
+  onCreate: (issue: JiraIssue) => void
 }) {
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
-  const [statusId, setStatusId] = useState(statuses[0]?.id || '')
-  const [priority, setPriority] = useState(0)
+  const [priority, setPriority] = useState('3')
   const [designType, setDesignType] = useState<DesignMeta['designType']>(undefined)
   const [loading, setLoading] = useState(false)
-
-  const selectedStatus = statuses.find(s => s.id === statusId)
 
   const handleCreate = async () => {
     if (!title.trim()) return
     setLoading(true)
     try {
-      const issue = await linearApi.createIssue(token, {
-        teamId,
-        title: title.trim(),
+      const issue = await jiraApi.createIssue(token, cloudId, {
+        projectKey,
+        summary: title.trim(),
         description: description.trim() || undefined,
-        stateId: statusId || undefined,
-        priority,
+        priorityId: priority,
       })
       if (designType) {
-        linearApi.saveDesignMeta(issue.id, {
-          designType,
-          checklist: [...linearApi.DEFAULT_DESIGN_CHECKLIST.map(c => ({ ...c }))],
-        })
+        jiraApi.saveDesignMeta(issue.key, { designType })
       }
       onCreate(issue)
       toast.success('Issue created')
@@ -556,12 +497,12 @@ function CreateIssueDialog({
     <Dialog open onOpenChange={open => !open && onClose()}>
       <DialogContent className="max-w-lg">
         <DialogHeader>
-          <DialogTitle>New Design Issue</DialogTitle>
+          <DialogTitle>New Jira Issue</DialogTitle>
         </DialogHeader>
 
         <div className="space-y-4 mt-2">
           <Input
-            placeholder="Issue title…"
+            placeholder="Issue summary…"
             value={title}
             onChange={e => setTitle(e.target.value)}
             autoFocus
@@ -577,46 +518,21 @@ function CreateIssueDialog({
           />
 
           <div className="grid grid-cols-2 gap-3">
-            {/* Status */}
-            <div>
-              <label className="text-xs text-muted-foreground block mb-1.5">Status</label>
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="outline" size="sm" className="w-full justify-start gap-2">
-                    <span
-                      className="w-2 h-2 rounded-full shrink-0"
-                      style={{ background: selectedStatus?.color }}
-                    />
-                    {selectedStatus?.name || 'Select…'}
-                    <ChevronDown className="h-3 w-3 ml-auto text-muted-foreground" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent>
-                  {statuses.map(s => (
-                    <DropdownMenuItem key={s.id} onClick={() => setStatusId(s.id)} className="gap-2">
-                      <span className="w-2 h-2 rounded-full" style={{ background: s.color }} />
-                      {s.name}
-                    </DropdownMenuItem>
-                  ))}
-                </DropdownMenuContent>
-              </DropdownMenu>
-            </div>
-
             {/* Priority */}
             <div>
               <label className="text-xs text-muted-foreground block mb-1.5">Priority</label>
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button variant="outline" size="sm" className="w-full justify-start gap-2">
-                    <span className={cn('text-xs font-medium', linearApi.PRIORITY_LABELS[priority]?.color)}>
-                      {linearApi.PRIORITY_LABELS[priority]?.label}
+                    <span className={cn('text-xs font-medium', jiraApi.PRIORITY_LABELS[priority]?.color)}>
+                      {jiraApi.PRIORITY_LABELS[priority]?.label}
                     </span>
                     <ChevronDown className="h-3 w-3 ml-auto text-muted-foreground" />
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent>
-                  {Object.entries(linearApi.PRIORITY_LABELS).map(([p, { label, color }]) => (
-                    <DropdownMenuItem key={p} onClick={() => setPriority(Number(p))}>
+                  {Object.entries(jiraApi.PRIORITY_LABELS).map(([p, { label, color }]) => (
+                    <DropdownMenuItem key={p} onClick={() => setPriority(p)}>
                       <span className={cn('text-sm', color)}>{label}</span>
                     </DropdownMenuItem>
                   ))}
@@ -629,7 +545,7 @@ function CreateIssueDialog({
           <div>
             <label className="text-xs text-muted-foreground block mb-1.5">Design Type</label>
             <div className="flex flex-wrap gap-1.5">
-              {Object.entries(linearApi.DESIGN_TYPES).map(([key, { label, color }]) => (
+              {Object.entries(jiraApi.DESIGN_TYPES).map(([key, { label, color }]) => (
                 <button
                   key={key}
                   onClick={() => setDesignType(designType === key as DesignMeta['designType'] ? undefined : key as DesignMeta['designType'])}
@@ -637,7 +553,7 @@ function CreateIssueDialog({
                     'text-xs px-2.5 py-1 rounded-full font-medium transition-all border',
                     designType === key
                       ? cn(color, 'border-transparent')
-                      : 'border-border text-muted-foreground hover:border-[#5E6AD2]/50'
+                      : 'border-border text-muted-foreground hover:border-[#0052CC]/50'
                   )}
                 >
                   {label}
@@ -660,54 +576,51 @@ function CreateIssueDialog({
 
 // ── Main Board ──────────────────────────────────────────────────────────────
 
-function LinearBoard({
+function JiraBoard({
   token,
-  team,
+  cloudId,
+  project,
   onDisconnect,
 }: {
   token: string
-  team: LinearTeam
+  cloudId: string
+  project: JiraProject
   onDisconnect: () => void
 }) {
-  const [issues, setIssues] = useState<LinearIssue[]>([])
-  const [statuses, setStatuses] = useState<LinearStatus[]>([])
-  const [members, setMembers] = useState<linearApi.LinearUser[]>([])
+  const [issues, setIssues] = useState<JiraIssue[]>([])
+  const [members, setMembers] = useState<JiraUser[]>([])
   const [loading, setLoading] = useState(true)
-  const [selectedIssue, setSelectedIssue] = useState<LinearIssue | null>(null)
+  const [selectedIssue, setSelectedIssue] = useState<JiraIssue | null>(null)
   const [showCreate, setShowCreate] = useState(false)
   const [refreshing, setRefreshing] = useState(false)
 
   const load = useCallback(async () => {
     try {
-      const [iss, stats, mems] = await Promise.all([
-        linearApi.getIssues(token, team.id),
-        linearApi.getTeamStatuses(token, team.id),
-        linearApi.getTeamMembers(token, team.id),
-      ])
-      setMembers(mems)
+      const iss = await jiraApi.getIssues(token, cloudId, project.key)
       setIssues(iss)
-      setStatuses(stats.sort((a, b) => {
-        const order = ['triage', 'backlog', 'unstarted', 'started', 'inReview', 'completed', 'cancelled']
-        return (order.indexOf(a.type) || 0) - (order.indexOf(b.type) || 0)
-      }))
-    } catch {
-      toast.error('Failed to load Linear issues')
+      // Members fetch is non-fatal (some Jira plans restrict this endpoint)
+      jiraApi.getProjectMembers(token, cloudId, project.key)
+        .then(mems => setMembers(mems))
+        .catch(() => {})
+    } catch (err) {
+      console.error('Jira load error:', err)
+      toast.error(`Failed to load issues: ${err instanceof Error ? err.message : 'Unknown error'}`)
     } finally {
       setLoading(false)
       setRefreshing(false)
     }
-  }, [token, team.id])
+  }, [token, cloudId, project.key])
 
   useEffect(() => { load() }, [load])
 
-  // Subscribe to Realtime for live updates from Linear webhooks
+  // Subscribe to Realtime for live updates from Jira webhooks
   useEffect(() => {
     const channel = supabase
-      .channel('linear-view-events')
+      .channel('jira-view-events')
       .on('postgres_changes', {
         event: 'INSERT',
         schema: 'public',
-        table: 'linear_events',
+        table: 'jira_events',
       }, () => { load() })
       .subscribe()
     return () => { supabase.removeChannel(channel) }
@@ -715,12 +628,12 @@ function LinearBoard({
 
   const handleRefresh = () => { setRefreshing(true); load() }
 
-  const handleIssueUpdate = (updated: LinearIssue) => {
+  const handleIssueUpdate = (updated: JiraIssue) => {
     setIssues(prev => prev.map(i => i.id === updated.id ? updated : i))
     if (selectedIssue?.id === updated.id) setSelectedIssue(updated)
   }
 
-  const handleIssueCreate = (issue: LinearIssue) => {
+  const handleIssueCreate = (issue: JiraIssue) => {
     setIssues(prev => [issue, ...prev])
   }
 
@@ -728,7 +641,7 @@ function LinearBoard({
     return (
       <div className="flex items-center justify-center h-full min-h-[400px] gap-2 text-muted-foreground">
         <Loader2 className="h-5 w-5 animate-spin" />
-        <span className="text-sm">Loading design board…</span>
+        <span className="text-sm">Loading issues…</span>
       </div>
     )
   }
@@ -738,21 +651,15 @@ function LinearBoard({
       {/* Header */}
       <div className="flex items-center justify-between px-6 py-4 border-b border-border shrink-0">
         <div className="flex items-center gap-3">
-          <div className="w-6 h-6 rounded bg-[#5E6AD2]/20 flex items-center justify-center">
-            <Layers className="h-3.5 w-3.5 text-[#5E6AD2]" />
+          <div className="w-6 h-6 rounded bg-[#0052CC]/20 flex items-center justify-center">
+            <Layers className="h-3.5 w-3.5 text-[#0052CC]" />
           </div>
-          <span className="font-semibold text-sm">{team.name}</span>
-          <span className="text-xs text-muted-foreground">Design Board</span>
+          <span className="font-semibold text-sm">{project.name}</span>
+          <span className="text-xs text-muted-foreground font-mono">{project.key}</span>
         </div>
 
         <div className="flex items-center gap-2">
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-8 w-8"
-            onClick={handleRefresh}
-            disabled={refreshing}
-          >
+          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={handleRefresh} disabled={refreshing}>
             <RefreshCw className={cn('h-4 w-4', refreshing && 'animate-spin')} />
           </Button>
           <Button variant="outline" size="sm" className="gap-1.5 h-8" onClick={() => setShowCreate(true)}>
@@ -767,7 +674,7 @@ function LinearBoard({
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
               <DropdownMenuItem onClick={onDisconnect} className="text-destructive">
-                Disconnect Linear
+                Disconnect Jira
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
@@ -780,8 +687,8 @@ function LinearBoard({
           <thead className="sticky top-0 z-10 bg-background">
             <tr className="border-b border-border text-xs text-muted-foreground uppercase tracking-wide">
               <th className="w-[28px] px-3 py-3"></th>
-              <th className="text-left font-medium px-3 py-3 w-[80px]">ID</th>
-              <th className="text-left font-medium px-3 py-3">Title</th>
+              <th className="text-left font-medium px-3 py-3 w-[90px]">Key</th>
+              <th className="text-left font-medium px-3 py-3">Summary</th>
               <th className="text-left font-medium px-3 py-3 w-[130px]">Status</th>
               <th className="text-left font-medium px-3 py-3 w-[100px]">Type</th>
               <th className="text-left font-medium px-3 py-3 w-[140px]">Assignee</th>
@@ -797,7 +704,7 @@ function LinearBoard({
               </tr>
             ) : (
               issues.map(issue => {
-                const meta = linearApi.getDesignMeta(issue.id)
+                const meta = jiraApi.getDesignMeta(issue.key)
                 return (
                   <motion.tr
                     key={issue.id}
@@ -807,26 +714,22 @@ function LinearBoard({
                     className="border-b border-border/40 hover:bg-accent/20 cursor-pointer transition-colors"
                   >
                     <td className="px-3 py-3 w-[28px]">
-                      <PriorityDot priority={issue.priority} />
+                      <PriorityDot priorityId={issue.fields.priority?.id} />
                     </td>
                     <td className="px-3 py-3 font-mono text-xs text-muted-foreground whitespace-nowrap">
-                      {issue.identifier}
+                      {issue.key}
                     </td>
                     <td className="px-3 py-3">
                       <div className="flex items-center gap-2 min-w-0">
-                        <span className="truncate font-medium text-foreground">{issue.title}</span>
+                        <span className="truncate font-medium text-foreground">{issue.fields.summary}</span>
                         {meta.figmaUrl && (
                           <Figma className="h-3 w-3 text-muted-foreground/50 shrink-0" />
                         )}
-                        {issue.labels.length > 0 && (
+                        {issue.fields.labels && issue.fields.labels.length > 0 && (
                           <div className="flex gap-1 shrink-0">
-                            {issue.labels.slice(0, 2).map(l => (
-                              <span
-                                key={l.id}
-                                className="text-[10px] px-1.5 py-0.5 rounded font-medium"
-                                style={{ background: `${l.color}22`, color: l.color }}
-                              >
-                                {l.name}
+                            {issue.fields.labels.slice(0, 2).map(l => (
+                              <span key={l} className="text-[10px] px-1.5 py-0.5 rounded font-medium bg-accent text-muted-foreground">
+                                {l}
                               </span>
                             ))}
                           </div>
@@ -835,38 +738,40 @@ function LinearBoard({
                     </td>
                     <td className="px-3 py-3 whitespace-nowrap">
                       <div className="flex items-center gap-2">
-                        <span
-                          className="w-2 h-2 rounded-full shrink-0"
-                          style={{ background: issue.status.color }}
-                        />
-                        <span className="text-xs text-muted-foreground">{issue.status.name}</span>
+                        <span className="w-2 h-2 rounded-full shrink-0" style={{ background: statusColor(issue.fields.status) }} />
+                        <span className="text-xs text-muted-foreground">{issue.fields.status.name}</span>
                       </div>
                     </td>
                     <td className="px-3 py-3">
                       {meta.designType && (
-                        <span className={cn('text-[10px] px-1.5 py-0.5 rounded font-medium', linearApi.DESIGN_TYPES[meta.designType]?.color)}>
-                          {linearApi.DESIGN_TYPES[meta.designType]?.label}
+                        <span className={cn('text-[10px] px-1.5 py-0.5 rounded font-medium', jiraApi.DESIGN_TYPES[meta.designType]?.color)}>
+                          {jiraApi.DESIGN_TYPES[meta.designType]?.label}
+                        </span>
+                      )}
+                      {!meta.designType && issue.fields.issuetype && (
+                        <span className="text-[10px] px-1.5 py-0.5 rounded font-medium bg-accent/50 text-muted-foreground">
+                          {issue.fields.issuetype.name}
                         </span>
                       )}
                     </td>
                     <td className="px-3 py-3 whitespace-nowrap">
-                      {issue.assignee ? (
+                      {issue.fields.assignee ? (
                         <div className="flex items-center gap-2">
-                          {issue.assignee.avatarUrl ? (
-                            <img src={issue.assignee.avatarUrl} className="w-5 h-5 rounded-full" alt="" />
+                          {issue.fields.assignee.avatarUrls?.['24x24'] ? (
+                            <img src={issue.fields.assignee.avatarUrls['24x24']} className="w-5 h-5 rounded-full" alt="" />
                           ) : (
-                            <div className="w-5 h-5 rounded-full bg-[#5E6AD2]/20 flex items-center justify-center text-[9px] font-semibold text-[#5E6AD2]">
-                              {issue.assignee.name[0]}
+                            <div className="w-5 h-5 rounded-full bg-[#0052CC]/20 flex items-center justify-center text-[9px] font-semibold text-[#0052CC]">
+                              {issue.fields.assignee.displayName[0]}
                             </div>
                           )}
-                          <span className="text-xs text-muted-foreground">{issue.assignee.name}</span>
+                          <span className="text-xs text-muted-foreground">{issue.fields.assignee.displayName}</span>
                         </div>
                       ) : (
                         <span className="text-xs text-muted-foreground/40">—</span>
                       )}
                     </td>
                     <td className="px-3 py-3 text-xs text-muted-foreground/60 whitespace-nowrap">
-                      {formatDistanceToNow(new Date(issue.updatedAt), { addSuffix: true })}
+                      {formatDistanceToNow(new Date(issue.fields.updated), { addSuffix: true })}
                     </td>
                   </motion.tr>
                 )
@@ -880,9 +785,9 @@ function LinearBoard({
       {selectedIssue && (
         <IssueDrawer
           issue={selectedIssue}
-          statuses={statuses}
           members={members}
           token={token}
+          cloudId={cloudId}
           onClose={() => setSelectedIssue(null)}
           onUpdate={handleIssueUpdate}
         />
@@ -891,9 +796,9 @@ function LinearBoard({
       {/* Create dialog */}
       {showCreate && (
         <CreateIssueDialog
-          statuses={statuses}
           token={token}
-          teamId={team.id}
+          cloudId={cloudId}
+          projectKey={project.key}
           onClose={() => setShowCreate(false)}
           onCreate={handleIssueCreate}
         />
@@ -902,32 +807,35 @@ function LinearBoard({
   )
 }
 
-// ── Team Selector ───────────────────────────────────────────────────────────
+// ── Project Selector ────────────────────────────────────────────────────────
 
-function TeamSelector({
-  teams,
+function ProjectSelector({
+  projects,
   onSelect,
 }: {
-  teams: LinearTeam[]
-  onSelect: (team: LinearTeam) => void
+  projects: JiraProject[]
+  onSelect: (project: JiraProject) => void
 }) {
   return (
     <div className="flex flex-col items-center justify-center h-full min-h-[400px] gap-6 px-4">
       <div className="text-center">
-        <h2 className="text-lg font-semibold mb-1">Select a Team</h2>
-        <p className="text-sm text-muted-foreground">Choose which Linear team to view</p>
+        <h2 className="text-lg font-semibold mb-1">Select a Project</h2>
+        <p className="text-sm text-muted-foreground">Choose which Jira project to view</p>
       </div>
       <div className="flex flex-col gap-2 w-full max-w-xs">
-        {teams.map(team => (
+        {projects.map(project => (
           <button
-            key={team.id}
-            onClick={() => onSelect(team)}
-            className="flex items-center gap-3 px-4 py-3 rounded-lg border border-border hover:border-[#5E6AD2]/50 hover:bg-accent/30 transition-all text-left"
+            key={project.id}
+            onClick={() => onSelect(project)}
+            className="flex items-center gap-3 px-4 py-3 rounded-lg border border-border hover:border-[#0052CC]/50 hover:bg-accent/30 transition-all text-left"
           >
-            <div className="w-8 h-8 rounded-lg bg-[#5E6AD2]/20 flex items-center justify-center text-sm font-bold text-[#5E6AD2]">
-              {team.name[0]}
+            <div className="w-8 h-8 rounded-lg bg-[#0052CC]/20 flex items-center justify-center text-sm font-bold text-[#0052CC]">
+              {project.key[0]}
             </div>
-            <span className="font-medium">{team.name}</span>
+            <div>
+              <span className="font-medium block">{project.name}</span>
+              <span className="text-xs text-muted-foreground font-mono">{project.key}</span>
+            </div>
           </button>
         ))}
       </div>
@@ -935,44 +843,44 @@ function TeamSelector({
   )
 }
 
-// ── Root LinearView ─────────────────────────────────────────────────────────
+// ── Root JiraView ───────────────────────────────────────────────────────────
 
-export function LinearView() {
-  const { token, isConnected, isLoading, disconnect } = useLinearToken()
-  const [teams, setTeams] = useState<LinearTeam[]>([])
-  const [selectedTeam, setSelectedTeam] = useState<LinearTeam | null>(() => {
-    const saved = localStorage.getItem(TEAM_KEY)
+export function JiraView() {
+  const { token, isConnected, isLoading, cloudId, disconnect } = useJiraToken()
+  const [projects, setProjects] = useState<JiraProject[]>([])
+  const [selectedProject, setSelectedProject] = useState<JiraProject | null>(() => {
+    const saved = localStorage.getItem(PROJECT_KEY)
     return saved ? JSON.parse(saved) : null
   })
-  const [loadingTeams, setLoadingTeams] = useState(false)
+  const [loadingProjects, setLoadingProjects] = useState(false)
 
   useEffect(() => {
-    if (!token) return
-    if (selectedTeam) return
-    setLoadingTeams(true)
-    linearApi.getTeams(token)
-      .then(t => {
-        setTeams(t)
-        if (t.length === 1) {
-          setSelectedTeam(t[0] ?? null)
-          localStorage.setItem(TEAM_KEY, JSON.stringify(t[0]))
+    if (!token || !cloudId) return
+    if (selectedProject) return
+    setLoadingProjects(true)
+    jiraApi.getProjects(token, cloudId)
+      .then(p => {
+        setProjects(p)
+        if (p.length === 1) {
+          setSelectedProject(p[0] ?? null)
+          localStorage.setItem(PROJECT_KEY, JSON.stringify(p[0]))
         }
       })
-      .catch(() => toast.error('Failed to load teams'))
-      .finally(() => setLoadingTeams(false))
-  }, [token, selectedTeam])
+      .catch(() => toast.error('Failed to load Jira projects'))
+      .finally(() => setLoadingProjects(false))
+  }, [token, cloudId, selectedProject])
 
-  const handleTeamSelect = (team: LinearTeam) => {
-    setSelectedTeam(team)
-    localStorage.setItem(TEAM_KEY, JSON.stringify(team))
+  const handleProjectSelect = (project: JiraProject) => {
+    setSelectedProject(project)
+    localStorage.setItem(PROJECT_KEY, JSON.stringify(project))
   }
 
   const handleDisconnect = async () => {
     await disconnect()
-    localStorage.removeItem(TEAM_KEY)
-    setSelectedTeam(null)
-    setTeams([])
-    toast.success('Disconnected from Linear')
+    localStorage.removeItem(PROJECT_KEY)
+    setSelectedProject(null)
+    setProjects([])
+    toast.success('Disconnected from Jira')
   }
 
   if (isLoading) {
@@ -984,14 +892,14 @@ export function LinearView() {
     )
   }
 
-  if (!isConnected || !token) return (
+  if (!isConnected || !token || !cloudId) return (
     <div className="flex flex-col items-center justify-center h-full min-h-[400px] gap-4 text-center px-4">
-      <img src="/linear.svg" alt="Linear" className="h-8 w-8 opacity-40 invert-on-light" />
-      <p className="text-sm text-muted-foreground">Linear is not connected. Connect it from the Integrations page.</p>
+      <JiraIcon className="h-8 w-8 opacity-40" />
+      <p className="text-sm text-muted-foreground">Jira is not connected. Connect it from the Integrations page.</p>
     </div>
   )
 
-  if (loadingTeams) {
+  if (loadingProjects) {
     return (
       <div className="flex items-center justify-center h-full min-h-[400px] gap-2 text-muted-foreground">
         <Loader2 className="h-5 w-5 animate-spin" />
@@ -1000,14 +908,15 @@ export function LinearView() {
     )
   }
 
-  if (!selectedTeam) {
-    return <TeamSelector teams={teams} onSelect={handleTeamSelect} />
+  if (!selectedProject) {
+    return <ProjectSelector projects={projects} onSelect={handleProjectSelect} />
   }
 
   return (
-    <LinearBoard
+    <JiraBoard
       token={token}
-      team={selectedTeam}
+      cloudId={cloudId}
+      project={selectedProject}
       onDisconnect={handleDisconnect}
     />
   )

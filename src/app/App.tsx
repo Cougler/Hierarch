@@ -9,8 +9,11 @@ import { DEMO_USER, DEMO_PROJECTS, DEMO_TASKS, DEMO_TIME_ENTRIES, DEMO_DESIGN_NO
 import { ThemeProvider } from './components/ThemeProvider'
 import { TooltipProvider } from './components/ui/tooltip'
 import { useIsMobile } from './hooks/use-mobile'
-import { handleLinearOAuthCallback } from './hooks/use-linear-token'
-import { handleFigmaOAuthCallback } from './hooks/use-figma-token'
+import { handleLinearOAuthCallback, useLinearToken } from './hooks/use-linear-token'
+import { handleFigmaOAuthCallback, useFigmaToken } from './hooks/use-figma-token'
+import { handleJiraOAuthCallback, useJiraToken } from './hooks/use-jira-token'
+import * as linearApi from './api/linear'
+import type { LinearIssue } from './api/linear'
 
 import Login from './components/Login'
 import Signup from './components/Signup'
@@ -33,6 +36,7 @@ import { UpdateNotification } from './components/UpdateNotification'
 import { CapacityView } from './components/CapacityView'
 import { FocusTimerView } from './components/FocusTimerView'
 import { LinearView } from './components/LinearView'
+import { JiraView } from './components/JiraView'
 import { IntegrationsPage } from './components/IntegrationsPage'
 import { NoteDrawer } from './components/NoteDrawer'
 import type { Artifact } from './components/NoteDrawer'
@@ -61,10 +65,12 @@ export default function App() {
     const saved = localStorage.getItem('hierarch-statuses')
     if (!saved) return DEFAULT_STATUSES
     const parsed: StatusConfig[] = JSON.parse(saved)
-    // Reset to defaults if saved statuses don't match current phase IDs
+    // Reset to defaults if saved statuses don't match current IDs or titles
     const defaultIds = new Set(DEFAULT_STATUSES.map(s => s.id))
     const savedIds = new Set(parsed.map(s => s.id))
-    if (DEFAULT_STATUSES.some(s => !savedIds.has(s.id)) || parsed.some(s => !defaultIds.has(s.id))) {
+    const defaultTitles = new Map(DEFAULT_STATUSES.map(s => [s.id, s.title]))
+    const titlesMatch = parsed.every(s => defaultTitles.get(s.id) === s.title)
+    if (DEFAULT_STATUSES.some(s => !savedIds.has(s.id)) || parsed.some(s => !defaultIds.has(s.id)) || !titlesMatch) {
       localStorage.setItem('hierarch-statuses', JSON.stringify(DEFAULT_STATUSES))
       return DEFAULT_STATUSES
     }
@@ -100,6 +106,99 @@ export default function App() {
   })
   const [selectedArtifact, setSelectedArtifact] = useState<Artifact | null>(null)
   const [previewProject, setPreviewProject] = useState<Project | null>(null)
+
+  // Integration data for Recent Progress feed
+  const linearToken = useLinearToken()
+  const figmaToken = useFigmaToken()
+  const jiraToken = useJiraToken()
+  const [recentLinearEvents, setRecentLinearEvents] = useState<{ id: string; action: string; type: string; title: string; identifier: string; status_name: string; status_color: string; assignee_name: string; actor_name: string; url: string; created_at: string }[]>([])
+  const [recentFigmaComments, setRecentFigmaComments] = useState<{ id: string; message: string; file_name: string; figma_user_handle: string; created_at: string }[]>([])
+  const [recentJiraEvents, setRecentJiraEvents] = useState<{ id: string; action: string; type: string; title: string; identifier: string; status_name: string; status_color: string; assignee_name: string; actor_name: string; url: string; created_at: string }[]>([])
+
+  // Fetch recent Linear events from linear_events table + subscribe to Realtime
+  useEffect(() => {
+    if (!linearToken.isConnected) { setRecentLinearEvents([]); return }
+    const saved = localStorage.getItem('hierarch-linear-team')
+    if (!saved) return
+    const team = JSON.parse(saved)
+
+    const fetchEvents = async () => {
+      try {
+        const { data } = await supabase
+          .from('linear_events')
+          .select('id, action, type, title, identifier, status_name, status_color, assignee_name, actor_name, url, created_at')
+          .eq('team_id', team.id)
+          .order('created_at', { ascending: false })
+          .limit(50)
+        setRecentLinearEvents(data || [])
+      } catch { /* ignore */ }
+    }
+
+    fetchEvents()
+
+    // Subscribe to Realtime for live updates
+    const channel = supabase
+      .channel('linear-events-feed')
+      .on('postgres_changes', {
+        event: 'INSERT',
+        schema: 'public',
+        table: 'linear_events',
+      }, () => { fetchEvents() })
+      .subscribe()
+
+    return () => { supabase.removeChannel(channel) }
+  }, [linearToken.isConnected])
+
+  // Fetch recent Figma comments mentioning user
+  useEffect(() => {
+    if (!figmaToken.isConnected || !figmaToken.viewer) { setRecentFigmaComments([]); return }
+    const figmaUserId = figmaToken.viewer.id
+    const fetchFigma = async () => {
+      try {
+        const { data } = await supabase
+          .from('figma_comments')
+          .select('id, message, file_name, figma_user_handle, created_at')
+          .or(`mentions.cs.{${figmaUserId}},figma_user_id.eq.${figmaUserId}`)
+          .order('created_at', { ascending: false })
+          .limit(50)
+        setRecentFigmaComments(data || [])
+      } catch { /* ignore */ }
+    }
+    fetchFigma()
+  }, [figmaToken.isConnected, figmaToken.viewer?.id])
+
+  // Fetch recent Jira events from jira_events table + subscribe to Realtime
+  useEffect(() => {
+    if (!jiraToken.isConnected) { setRecentJiraEvents([]); return }
+    const saved = localStorage.getItem('hierarch-jira-project')
+    if (!saved) return
+    const project = JSON.parse(saved)
+
+    const fetchEvents = async () => {
+      try {
+        const { data } = await supabase
+          .from('jira_events')
+          .select('id, action, type, title, identifier, status_name, status_color, assignee_name, actor_name, url, created_at')
+          .eq('project_key', project.key)
+          .order('created_at', { ascending: false })
+          .limit(50)
+        setRecentJiraEvents(data || [])
+      } catch { /* ignore */ }
+    }
+
+    fetchEvents()
+
+    const channel = supabase
+      .channel('jira-events-feed')
+      .on('postgres_changes', {
+        event: 'INSERT',
+        schema: 'public',
+        table: 'jira_events',
+      }, () => { fetchEvents() })
+      .subscribe()
+
+    return () => { supabase.removeChannel(channel) }
+  }, [jiraToken.isConnected])
 
   const tempIdMapping = useRef<Record<string, string>>({})
   const savingTaskIds = useRef<Set<string>>(new Set())
@@ -190,6 +289,18 @@ export default function App() {
         })
         .catch(() => {
           toast.error('Failed to connect to Figma')
+          window.history.replaceState({}, '', '/')
+        })
+    } else if (path === '/auth/jira/callback') {
+      handleJiraOAuthCallback()
+        .then((success) => {
+          if (success) {
+            toast.success('Connected to Jira')
+            setActiveView('jira')
+          }
+        })
+        .catch(() => {
+          toast.error('Failed to connect to Jira')
           window.history.replaceState({}, '', '/')
         })
     }
@@ -373,7 +484,27 @@ export default function App() {
   }
 
   const handleProjectUpdate = async (id: string, updates: Partial<Project>) => {
+    // If phase is changing, record a phase transition
+    if (updates.metadata?.phase !== undefined) {
+      const currentProject = projects.find(p => p.id === id)
+      const currentPhase = currentProject?.metadata?.phase
+      if (currentProject && updates.metadata.phase !== currentPhase) {
+        const transition: PhaseTransition = {
+          id: `pt-${Date.now()}`,
+          fromPhase: currentPhase || '',
+          toPhase: updates.metadata.phase,
+          timestamp: new Date().toISOString(),
+        }
+        const history = [...(currentProject.metadata?.phaseHistory ?? []), transition]
+        updates = {
+          ...updates,
+          metadata: { ...updates.metadata, phaseHistory: history },
+        }
+      }
+    }
+
     setProjects(prev => prev.map(p => p.id === id ? { ...p, ...updates } : p))
+    setPreviewProject(prev => prev?.id === id ? { ...prev, ...updates } : prev)
     if (demoMode) return
 
     const result = await api.updateProject(id, updates)
@@ -420,6 +551,7 @@ export default function App() {
       assignees: taskData.assignees || [],
       order: tasks.length,
       project: taskData.project,
+      createdAt: new Date().toISOString(),
     }
 
     setTasks(prev => [...prev, newTask])
@@ -474,7 +606,7 @@ export default function App() {
         const history = [...(currentTask.phaseHistory ?? []), transition]
         updates = { ...updates, phaseHistory: history }
 
-        // If entering a feedback phase, auto-create a feedback note and open it
+        // If entering review phase, auto-create a feedback note and open it
         const targetPhase = statuses.find(s => s.id === updates.status)
         if (targetPhase?.isFeedback) {
           const artifact: Artifact = {
@@ -591,12 +723,12 @@ export default function App() {
     localStorage.setItem('hierarch-artifacts', JSON.stringify(artifacts))
   }, [artifacts])
 
-  const handleArtifactCreate = (projectId: string) => {
+  const handleArtifactCreate = (projectId: string, artifactType?: string) => {
     const artifact: Artifact = {
       id: `dn-${Date.now()}`,
       title: '',
       text: '',
-      type: 'freeform',
+      type: (artifactType as Artifact['type']) || 'freeform',
       projectId: projectId || undefined,
       timestamp: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
@@ -846,7 +978,21 @@ export default function App() {
           onTaskClick={handleTaskClick}
           onTaskCreate={handleTaskCreate}
           onViewChange={handleViewChange}
-          onNewTask={() => handleOpenNewTask()}
+          onStandupCreate={(text) => {
+            const artifact: Artifact = {
+              id: `dn-${Date.now()}`,
+              title: `Standup — ${new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}`,
+              text,
+              type: 'doc',
+              timestamp: new Date().toISOString(),
+              updatedAt: new Date().toISOString(),
+            }
+            setArtifacts(prev => [artifact, ...prev])
+            closeAllDrawers()
+            setSelectedArtifact(artifact)
+            setDrawerDirection(1)
+            setDrawerStack([{ type: 'artifact', artifactId: artifact.id }])
+          }}
           artifacts={artifacts}
           onArtifactCreate={handleArtifactCreate}
           onArtifactClick={handleArtifactClick}
@@ -864,6 +1010,9 @@ export default function App() {
           }}
           onDrawerTaskClick={pushDrawerTask}
           onDrawerArtifactClick={pushDrawerArtifact}
+          recentLinearEvents={recentLinearEvents}
+          recentFigmaComments={recentFigmaComments}
+          recentJiraEvents={recentJiraEvents}
           onProjectCreate={() => {
             const tempId = Math.random().toString(36).substr(2, 9)
             const newProject: Project = {
@@ -974,6 +1123,7 @@ export default function App() {
     }
 
     if (activeView === 'figma') return <FigmaView />
+    if (activeView === 'jira') return <JiraView />
     if (activeView === 'apps') return <AppsDashboard />
     if (activeView === 'integrations') return <IntegrationsPage onViewChange={setActiveView} />
     if (activeView === 'linear') return <LinearView />
@@ -1013,6 +1163,7 @@ export default function App() {
     if (activeView === 'focus') return 'Focus Timer'
     if (activeView === 'time-tracking') return 'Time Tracking'
     if (activeView === 'figma') return 'Figma'
+    if (activeView === 'jira') return 'Jira'
     if (activeView === 'apps') return 'Apps'
     if (activeView === 'integrations') return 'Integrations'
     if (activeView === 'linear') return 'Linear'

@@ -410,7 +410,8 @@ export function NoteDrawer({
 
   // ─── Rich text commands ───
   const exec = (cmd: string, value?: string) => {
-    document.execCommand(cmd, false, value);
+    const v = cmd === 'formatBlock' && value ? `<${value}>` : value;
+    document.execCommand(cmd, false, v);
     editorRef.current?.focus();
     debouncedSave();
   };
@@ -570,17 +571,13 @@ export function NoteDrawer({
             className="w-full bg-transparent text-lg font-semibold text-foreground outline-none placeholder:text-muted-foreground/40"
           />
 
-          {/* Type selector pill */}
+          {/* Type selector */}
           <Popover open={typeOpen} onOpenChange={setTypeOpen}>
             <PopoverTrigger asChild>
-              <button className={cn(
-                'flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium transition-colors',
-                typeMeta.bg, typeMeta.color,
-                'hover:brightness-110',
-              )}>
+              <button className="flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-xs font-medium bg-surface hover:bg-surface-hover transition-colors">
                 <TypeIcon className="h-3 w-3" />
                 {typeMeta.label}
-                <ChevronDown className="h-2.5 w-2.5 opacity-60" />
+                <ChevronDown className="h-2.5 w-2.5 opacity-40" />
               </button>
             </PopoverTrigger>
             <PopoverContent align="start" className="w-[240px] p-1.5" sideOffset={4}>
@@ -595,11 +592,11 @@ export function NoteDrawer({
                       className={cn(
                         'flex items-center gap-2.5 rounded-lg px-3 py-2.5 text-xs transition-colors',
                         isActive
-                          ? cn(t.bg, t.color, 'font-medium')
+                          ? 'bg-accent/50 text-foreground font-medium'
                           : 'text-muted-foreground hover:bg-surface hover:text-foreground',
                       )}
                     >
-                      <Icon className={cn('h-4 w-4 shrink-0', isActive ? t.color : 'opacity-60')} />
+                      <Icon className={cn('h-4 w-4 shrink-0', isActive ? '' : 'opacity-60')} />
                       {t.label}
                     </button>
                   );
@@ -872,7 +869,7 @@ export function NoteDrawer({
               if ((e.metaKey || e.ctrlKey) && e.key === 'k') { e.preventDefault(); handleLink(); }
             }}
             style={{ maxWidth: 'calc(420px - 40px)' }}
-            className="min-h-[200px] w-full outline-none text-sm text-foreground/90 leading-relaxed [word-break:break-word] [overflow-wrap:anywhere] [&_h1]:text-xl [&_h1]:font-bold [&_h1]:mt-5 [&_h1]:mb-2 [&_h2]:text-base [&_h2]:font-semibold [&_h2]:mt-4 [&_h2]:mb-2 [&_h3]:text-sm [&_h3]:font-medium [&_h3]:mt-3 [&_h3]:mb-1.5 [&_ul]:list-disc [&_ul]:pl-5 [&_ul]:my-2 [&_ol]:list-decimal [&_ol]:pl-5 [&_ol]:my-2 [&_li]:my-0.5 [&_a]:text-primary [&_a]:underline [&_a]:underline-offset-2 [&_a]:break-all [&_a:hover]:text-primary/80 [&_blockquote]:border-l-2 [&_blockquote]:border-primary/40 [&_blockquote]:pl-3 [&_blockquote]:italic [&_blockquote]:text-muted-foreground [&_blockquote]:my-2 [&_hr]:border-border/30 [&_hr]:my-4 placeholder:text-muted-foreground/40"
+            className="min-h-[200px] w-full outline-none text-[12px] text-foreground/90 leading-relaxed [word-break:break-word] [overflow-wrap:anywhere] [&_h1]:text-[24px] [&_h1]:font-bold [&_h1]:mt-5 [&_h1]:mb-2 [&_h2]:text-[18px] [&_h2]:font-semibold [&_h2]:mt-4 [&_h2]:mb-2 [&_h3]:text-[14px] [&_h3]:font-medium [&_h3]:mt-3 [&_h3]:mb-1.5 [&_p]:text-[12px] [&_ul]:list-disc [&_ul]:pl-5 [&_ul]:my-2 [&_ol]:list-decimal [&_ol]:pl-5 [&_ol]:my-2 [&_li]:my-0.5 [&_a]:text-primary [&_a]:underline [&_a]:underline-offset-2 [&_a]:break-all [&_a:hover]:text-primary/80 [&_blockquote]:border-l-2 [&_blockquote]:border-primary/40 [&_blockquote]:pl-3 [&_blockquote]:italic [&_blockquote]:text-muted-foreground [&_blockquote]:my-2 [&_hr]:border-border/30 [&_hr]:my-4 placeholder:text-muted-foreground/40"
             data-placeholder="Start writing..."
           />
 

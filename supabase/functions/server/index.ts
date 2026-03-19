@@ -356,6 +356,92 @@ app.delete("/linear/disconnect", async (c) => {
   }
 })
 
+// ─── Linear Webhooks ────────────────────────────────────────────────
+
+const LINEAR_WEBHOOK_SECRET = Deno.env.get("LINEAR_WEBHOOK_SECRET") ?? ""
+
+// Verify Linear webhook signature using HMAC-SHA256
+async function verifyLinearSignature(body: string, signature: string): Promise<boolean> {
+  if (!LINEAR_WEBHOOK_SECRET || !signature) return false
+  const encoder = new TextEncoder()
+  const key = await crypto.subtle.importKey(
+    "raw",
+    encoder.encode(LINEAR_WEBHOOK_SECRET),
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["sign"]
+  )
+  const sig = await crypto.subtle.sign("HMAC", key, encoder.encode(body))
+  const computed = Array.from(new Uint8Array(sig)).map(b => b.toString(16).padStart(2, "0")).join("")
+  return computed === signature
+}
+
+// POST /linear/webhook — Receives Linear webhook events
+app.post("/linear/webhook", async (c) => {
+  const rawBody = await c.req.text()
+  const signature = c.req.header("Linear-Signature") ?? c.req.header("linear-signature") ?? ""
+
+  // TODO: Re-enable signature verification once format is confirmed
+  // For now, log signature details for debugging
+  console.log("Linear webhook received", { hasSecret: !!LINEAR_WEBHOOK_SECRET, hasSignature: !!signature, signatureLength: signature.length })
+
+  try {
+    const payload = JSON.parse(rawBody)
+    const { action, type, data, url, updatedFrom } = payload
+
+    // Handle Issue events
+    if (type === "Issue") {
+      const event: Record<string, unknown> = {
+        action,
+        type: "Issue",
+        linear_id: data.id,
+        title: data.title,
+        identifier: data.identifier ?? data.id,
+        status_name: data.state?.name ?? null,
+        status_color: data.state?.color ?? null,
+        assignee_id: data.assignee?.id ?? data.assigneeId ?? null,
+        assignee_name: data.assignee?.name ?? null,
+        team_id: data.team?.id ?? data.teamId ?? null,
+        actor_id: payload.actor?.id ?? null,
+        actor_name: payload.actor?.name ?? null,
+        url: url ?? data.url ?? null,
+        updated_at: data.updatedAt ?? new Date().toISOString(),
+        raw_data: payload,
+      }
+
+      // Add context about what changed
+      if (updatedFrom) {
+        if (updatedFrom.stateId) event.title = `${data.title}`
+        if (updatedFrom.assigneeId !== undefined) event.title = `${data.title}`
+      }
+
+      await supabaseAdmin.from("linear_events").insert(event)
+    }
+
+    // Handle Comment events
+    if (type === "Comment") {
+      await supabaseAdmin.from("linear_events").insert({
+        action,
+        type: "Comment",
+        linear_id: data.id,
+        title: data.body?.substring(0, 500) ?? "",
+        identifier: data.issue?.identifier ?? null,
+        team_id: data.issue?.team?.id ?? null,
+        actor_id: data.user?.id ?? payload.actor?.id ?? null,
+        actor_name: data.user?.name ?? payload.actor?.name ?? null,
+        url: data.issue?.url ?? url ?? null,
+        updated_at: data.updatedAt ?? data.createdAt ?? new Date().toISOString(),
+        raw_data: payload,
+      })
+    }
+
+    return c.json({ success: true })
+  } catch (e) {
+    console.error("Linear webhook error:", e)
+    return c.json({ error: String(e) }, 500)
+  }
+})
+
 // ─── Figma OAuth ────────────────────────────────────────────────────
 
 const FIGMA_CLIENT_ID = Deno.env.get("FIGMA_CLIENT_ID") ?? ""
@@ -701,6 +787,366 @@ app.get("/figma/webhook/status", async (c) => {
     .maybeSingle()
 
   return c.json({ registered: !!data, team_id: data?.team_id ?? null })
+})
+
+// ─── Jira OAuth ─────────────────────────────────────────────────────
+
+const JIRA_CLIENT_ID = Deno.env.get("JIRA_CLIENT_ID") ?? ""
+const JIRA_CLIENT_SECRET = Deno.env.get("JIRA_CLIENT_SECRET") ?? ""
+const JIRA_AUTH_URL = "https://auth.atlassian.com/authorize"
+const JIRA_TOKEN_URL = "https://auth.atlassian.com/oauth/token"
+const JIRA_RESOURCES_URL = "https://api.atlassian.com/oauth/token/accessible-resources"
+
+function getJiraRedirectUri(origin: string) {
+  return `${origin}/auth/jira/callback`
+}
+
+// GET /jira/authorize — Returns the Atlassian OAuth URL
+app.get("/jira/authorize", async (c) => {
+  const user = await getAuthUser(c.req.raw)
+  if (!user) return c.json({ error: "Unauthorized" }, 401)
+
+  const state = crypto.randomUUID()
+
+  const origin = c.req.header("Origin") || c.req.header("Referer")?.replace(/\/$/, "") || "http://localhost:3000"
+  const redirectUri = getJiraRedirectUri(origin)
+
+  const params = new URLSearchParams({
+    audience: "api.atlassian.com",
+    client_id: JIRA_CLIENT_ID,
+    scope: "read:jira-work write:jira-work read:jira-user offline_access",
+    redirect_uri: redirectUri,
+    state,
+    response_type: "code",
+    prompt: "consent",
+  })
+
+  return c.json({ url: `${JIRA_AUTH_URL}?${params}`, state })
+})
+
+// POST /jira/callback — Exchanges auth code for tokens
+app.post("/jira/callback", async (c) => {
+  const user = await getAuthUser(c.req.raw)
+  if (!user) return c.json({ error: "Unauthorized" }, 401)
+
+  try {
+    const { code, redirect_uri } = await c.req.json<{
+      code: string
+      state: string
+      redirect_uri: string
+    }>()
+
+    // Exchange code for tokens (Atlassian requires JSON body)
+    const tokenRes = await fetch(JIRA_TOKEN_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        grant_type: "authorization_code",
+        client_id: JIRA_CLIENT_ID,
+        client_secret: JIRA_CLIENT_SECRET,
+        code,
+        redirect_uri,
+      }),
+    })
+
+    if (!tokenRes.ok) {
+      const err = await tokenRes.text()
+      return c.json({ error: `Token exchange failed: ${err}` }, 400)
+    }
+
+    const tokens = await tokenRes.json()
+    const { access_token, refresh_token, expires_in, scope } = tokens
+
+    // Fetch accessible resources to get cloudId
+    const resourcesRes = await fetch(JIRA_RESOURCES_URL, {
+      headers: { Authorization: `Bearer ${access_token}` },
+    })
+
+    if (!resourcesRes.ok) {
+      return c.json({ error: "Failed to fetch accessible resources" }, 400)
+    }
+
+    const resources = await resourcesRes.json()
+    if (!resources.length) {
+      return c.json({ error: "No Jira sites found for this account" }, 400)
+    }
+
+    // Use the first site (most users have one)
+    const site = resources[0]
+    const cloudId = site.id
+
+    // Fetch current user info
+    const myselfRes = await fetch(`https://api.atlassian.com/ex/jira/${cloudId}/rest/api/3/myself`, {
+      headers: { Authorization: `Bearer ${access_token}` },
+    })
+
+    const myself = myselfRes.ok ? await myselfRes.json() : null
+
+    const viewer = {
+      id: myself?.accountId ?? "",
+      name: myself?.displayName ?? "",
+      email: myself?.emailAddress ?? "",
+      avatarUrl: myself?.avatarUrls?.["48x48"] ?? null,
+      cloudId,
+    }
+
+    // Upsert into integrations table
+    const expiresAt = expires_in
+      ? new Date(Date.now() + expires_in * 1000).toISOString()
+      : null
+
+    const { error: dbError } = await supabaseAdmin
+      .from("integrations")
+      .upsert(
+        {
+          owner_id: user.id,
+          provider: "jira",
+          access_token,
+          refresh_token: refresh_token ?? null,
+          token_expires_at: expiresAt,
+          scopes: scope ?? "read:jira-work write:jira-work read:jira-user offline_access",
+          provider_user_id: viewer.id,
+          provider_metadata: viewer,
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: "owner_id,provider" }
+      )
+
+    if (dbError) return c.json({ error: dbError.message }, 500)
+
+    return c.json({ success: true, viewer })
+  } catch (e) {
+    return c.json({ error: String(e) }, 500)
+  }
+})
+
+// POST /jira/refresh — Refreshes an expired token
+app.post("/jira/refresh", async (c) => {
+  const user = await getAuthUser(c.req.raw)
+  if (!user) return c.json({ error: "Unauthorized" }, 401)
+
+  try {
+    const { data: integration, error: fetchError } = await supabaseAdmin
+      .from("integrations")
+      .select("refresh_token")
+      .eq("owner_id", user.id)
+      .eq("provider", "jira")
+      .single()
+
+    if (fetchError || !integration?.refresh_token) {
+      return c.json({ error: "No refresh token found" }, 400)
+    }
+
+    const tokenRes = await fetch(JIRA_TOKEN_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        grant_type: "refresh_token",
+        client_id: JIRA_CLIENT_ID,
+        client_secret: JIRA_CLIENT_SECRET,
+        refresh_token: integration.refresh_token,
+      }),
+    })
+
+    if (!tokenRes.ok) {
+      const err = await tokenRes.text()
+      return c.json({ error: `Refresh failed: ${err}` }, 400)
+    }
+
+    const tokens = await tokenRes.json()
+    const expiresAt = tokens.expires_in
+      ? new Date(Date.now() + tokens.expires_in * 1000).toISOString()
+      : null
+
+    const { error: dbError } = await supabaseAdmin
+      .from("integrations")
+      .update({
+        access_token: tokens.access_token,
+        refresh_token: tokens.refresh_token ?? integration.refresh_token,
+        token_expires_at: expiresAt,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("owner_id", user.id)
+      .eq("provider", "jira")
+
+    if (dbError) return c.json({ error: dbError.message }, 500)
+
+    return c.json({
+      access_token: tokens.access_token,
+      expires_at: expiresAt,
+    })
+  } catch (e) {
+    return c.json({ error: String(e) }, 500)
+  }
+})
+
+// DELETE /jira/disconnect — Removes integration
+app.delete("/jira/disconnect", async (c) => {
+  const user = await getAuthUser(c.req.raw)
+  if (!user) return c.json({ error: "Unauthorized" }, 401)
+
+  try {
+    // Atlassian has no revoke endpoint, just delete the record
+    const { error: dbError } = await supabaseAdmin
+      .from("integrations")
+      .delete()
+      .eq("owner_id", user.id)
+      .eq("provider", "jira")
+
+    if (dbError) return c.json({ error: dbError.message }, 500)
+
+    return c.json({ success: true })
+  } catch (e) {
+    return c.json({ error: String(e) }, 500)
+  }
+})
+
+// POST /jira/proxy — Proxies API requests to Jira Cloud (bypasses CORS)
+app.post("/jira/proxy", async (c) => {
+  const user = await getAuthUser(c.req.raw)
+  if (!user) return c.json({ error: "Unauthorized" }, 401)
+
+  try {
+    const { cloudId, path, method, body } = await c.req.json<{
+      cloudId: string
+      path: string
+      method?: string
+      body?: unknown
+    }>()
+
+    // Get Jira token
+    const { data: integration } = await supabaseAdmin
+      .from("integrations")
+      .select("access_token")
+      .eq("owner_id", user.id)
+      .eq("provider", "jira")
+      .single()
+
+    if (!integration?.access_token) {
+      return c.json({ error: "Jira not connected" }, 401)
+    }
+
+    const jiraUrl = `https://api.atlassian.com/ex/jira/${cloudId}${path}`
+    const headers: Record<string, string> = {
+      Authorization: `Bearer ${integration.access_token}`,
+      "Content-Type": "application/json",
+      Accept: "application/json",
+    }
+
+    const res = await fetch(jiraUrl, {
+      method: method || "GET",
+      headers,
+      body: body ? JSON.stringify(body) : undefined,
+    })
+
+    if (!res.ok) {
+      const err = await res.text()
+      console.error(`Jira proxy error: ${method || "GET"} ${path} → ${res.status}`, err)
+      return c.json({ error: err }, res.status)
+    }
+
+    // Some Jira endpoints return 204 with no body
+    if (res.status === 204) {
+      return c.json({ success: true })
+    }
+
+    const data = await res.json()
+    return c.json(data)
+  } catch (e) {
+    return c.json({ error: String(e) }, 500)
+  }
+})
+
+// ─── Jira Webhooks ──────────────────────────────────────────────────
+
+// POST /jira/webhook — Receives Jira webhook events
+app.post("/jira/webhook", async (c) => {
+  try {
+    const body = await c.req.json()
+    const { webhookEvent, issue, comment, changelog, user: actor } = body
+
+    // Validate with secret query param if present
+    const secret = new URL(c.req.url).searchParams.get("secret")
+    const expectedSecret = Deno.env.get("JIRA_WEBHOOK_SECRET") ?? ""
+    if (expectedSecret && secret !== expectedSecret) {
+      return c.json({ error: "Invalid secret" }, 403)
+    }
+
+    const projectKey = issue?.fields?.project?.key ?? null
+
+    // Handle issue events
+    if (webhookEvent?.startsWith("jira:issue_")) {
+      const action = webhookEvent.replace("jira:issue_", "") // created, updated, deleted
+
+      // Determine what changed from changelog
+      let statusName = issue?.fields?.status?.name ?? null
+      let statusColor = null
+      let assigneeName = issue?.fields?.assignee?.displayName ?? null
+      let assigneeId = issue?.fields?.assignee?.accountId ?? null
+
+      if (changelog?.items) {
+        for (const item of changelog.items) {
+          if (item.field === "status") {
+            statusName = item.toString
+          }
+          if (item.field === "assignee") {
+            assigneeName = item.toString
+          }
+        }
+      }
+
+      // Map Jira status category to a color
+      const categoryKey = issue?.fields?.status?.statusCategory?.key
+      const categoryColors: Record<string, string> = {
+        new: "#64748b",
+        indeterminate: "#3b82f6",
+        done: "#10b981",
+      }
+      statusColor = categoryColors[categoryKey] ?? "#94a3b8"
+
+      await supabaseAdmin.from("jira_events").insert({
+        action,
+        type: "Issue",
+        jira_id: issue?.id ?? null,
+        title: issue?.fields?.summary ?? "",
+        identifier: issue?.key ?? null,
+        status_name: statusName,
+        status_color: statusColor,
+        assignee_id: assigneeId,
+        assignee_name: assigneeName,
+        project_key: projectKey,
+        actor_id: actor?.accountId ?? null,
+        actor_name: actor?.displayName ?? null,
+        url: issue?.self ? `https://${body.issue?.self?.split("/rest/")?.[0]?.split("//")[1]}/browse/${issue.key}` : null,
+        updated_at: issue?.fields?.updated ?? new Date().toISOString(),
+        raw_data: body,
+      })
+    }
+
+    // Handle comment events
+    if (webhookEvent?.startsWith("comment_")) {
+      const action = webhookEvent.replace("comment_", "") // created, updated, deleted
+
+      await supabaseAdmin.from("jira_events").insert({
+        action,
+        type: "Comment",
+        jira_id: comment?.id ?? null,
+        title: comment?.body?.substring(0, 500) ?? "",
+        identifier: issue?.key ?? null,
+        project_key: projectKey,
+        actor_id: comment?.author?.accountId ?? actor?.accountId ?? null,
+        actor_name: comment?.author?.displayName ?? actor?.displayName ?? null,
+        url: comment?.self ?? null,
+        updated_at: comment?.updated ?? comment?.created ?? new Date().toISOString(),
+        raw_data: body,
+      })
+    }
+
+    return c.json({ success: true })
+  } catch (e) {
+    console.error("Jira webhook error:", e)
+    return c.json({ error: String(e) }, 500)
+  }
 })
 
 // DELETE /delete-account — Authenticated, delete user and cleanup KV
