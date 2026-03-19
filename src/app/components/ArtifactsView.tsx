@@ -15,6 +15,9 @@ import {
   DropdownMenuSeparator, DropdownMenuTrigger, DropdownMenuCheckboxItem,
 } from '@/app/components/ui/dropdown-menu';
 import {
+  ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuTrigger,
+} from '@/app/components/ui/context-menu';
+import {
   Tooltip, TooltipContent, TooltipTrigger,
 } from '@/app/components/ui/tooltip';
 import { formatDistanceToNow } from 'date-fns';
@@ -94,7 +97,7 @@ type GroupKey = 'type' | 'project' | 'none';
 interface ArtifactsViewProps {
   artifacts: Artifact[];
   projects: Project[];
-  onArtifactCreate: (projectId: string) => void;
+  onArtifactCreate: (projectId: string, artifactType?: string) => void;
   onArtifactClick: (artifact: Artifact) => void;
   onArtifactDelete: (id: string) => void;
 }
@@ -248,6 +251,8 @@ export function ArtifactsView({
     const projectName = getProjectName(artifact.projectId);
 
     return (
+      <ContextMenu>
+        <ContextMenuTrigger asChild>
       <div
         onClick={() => onArtifactClick(artifact)}
         style={{ gridTemplateColumns: columnTemplate }}
@@ -316,8 +321,56 @@ export function ArtifactsView({
           </DropdownMenu>
         </div>
       </div>
+        </ContextMenuTrigger>
+        <ContextMenuContent>
+          <ContextMenuItem
+            className="text-destructive"
+            onClick={() => { onArtifactDelete(artifact.id); toast.success('Artifact deleted'); }}
+          >
+            <Trash2 className="mr-2 h-3.5 w-3.5" /> Delete
+          </ContextMenuItem>
+        </ContextMenuContent>
+      </ContextMenu>
     );
   };
+
+  // ─── Artifact type starter grid ──────────────────────────────────────
+
+  const artifactTypeCards: { key: ArtifactType; label: string; description: string }[] = [
+    { key: 'freeform', label: 'Note', description: 'Open-ended notes and ideas' },
+    { key: 'decision', label: 'Decision', description: 'Record a design decision' },
+    { key: 'feedback', label: 'Feedback', description: 'Capture review feedback' },
+    { key: 'research', label: 'Research', description: 'User research and findings' },
+    { key: 'link', label: 'Link', description: 'Save a reference URL' },
+    { key: 'figma', label: 'Figma', description: 'Link a Figma file' },
+    { key: 'prototype', label: 'Prototype', description: 'Link a prototype' },
+    { key: 'screenshot', label: 'Screenshot', description: 'Attach a screenshot' },
+    { key: 'video', label: 'Video', description: 'Embed a video' },
+    { key: 'doc', label: 'Document', description: 'Write a long-form doc' },
+  ]
+
+  const renderArtifactTypeGrid = () => (
+    <div className="grid grid-cols-5 gap-3 w-[620px]">
+      {artifactTypeCards.map((d) => {
+        const Icon = ARTIFACT_TYPE_ICONS[d.key] || FileText
+        const color = ARTIFACT_TYPE_COLORS[d.key] || 'text-muted-foreground'
+        const bg = ARTIFACT_TYPE_BG_COLORS[d.key] || 'bg-muted/10'
+        return (
+          <button
+            key={d.key}
+            onClick={() => onArtifactCreate('', d.key)}
+            className="rounded-xl border border-border/40 bg-card/30 p-4 text-left transition-colors hover:bg-accent/40 hover:border-border/60 cursor-pointer"
+          >
+            <div className={cn('w-8 h-8 rounded-lg flex items-center justify-center mb-3', bg)}>
+              <Icon className={cn('h-4 w-4', color)} />
+            </div>
+            <p className="text-xs font-medium text-foreground">{d.label}</p>
+            <p className="text-[10px] text-muted-foreground/60 mt-0.5 leading-snug">{d.description}</p>
+          </button>
+        )
+      })}
+    </div>
+  )
 
   // ─── Grid view (cards) ────────────────────────────────────────────────
 
@@ -327,11 +380,20 @@ export function ArtifactsView({
       : sorted;
 
     if (itemsToRender.length === 0) {
+      if (search || hasActiveFilters) {
+        return (
+          <div className="flex h-32 flex-col items-center justify-center gap-2 text-muted-foreground">
+            <p className="text-sm">No artifacts match your filters</p>
+          </div>
+        );
+      }
       return (
-        <div className="flex h-32 flex-col items-center justify-center gap-2 text-muted-foreground">
-          <p className="text-sm">
-            {search || hasActiveFilters ? 'No artifacts match your filters' : 'No artifacts yet'}
+        <div className="flex flex-col items-center pt-16">
+          <h3 className="text-lg font-semibold text-foreground mb-1.5">No artifacts yet</h3>
+          <p className="text-[13px] text-muted-foreground/70 leading-relaxed max-w-[300px] text-center mb-6">
+            Choose a type below to create your first artifact.
           </p>
+          {renderArtifactTypeGrid()}
         </div>
       );
     }
@@ -521,10 +583,19 @@ export function ArtifactsView({
       activeFilterCount={filterTypes.length + filterProjects.length}
       emptyMessage="No artifacts yet"
       filteredEmptyMessage="No artifacts match your filters"
+      emptyContent={
+        <div className="flex flex-col items-center pt-16">
+          <h3 className="text-lg font-semibold text-foreground mb-1.5">No artifacts yet</h3>
+          <p className="text-[13px] text-muted-foreground/70 leading-relaxed max-w-[300px] text-center mb-6">
+            Choose a type below to create your first artifact.
+          </p>
+          {renderArtifactTypeGrid()}
+        </div>
+      }
       toolbarRight={
         <Tooltip>
           <TooltipTrigger asChild>
-            <Button size="sm" className="h-7 gap-1.5 text-xs bg-[#bf7535] hover:bg-[#bf7535]/90" onClick={() => onArtifactCreate('')}>
+            <Button size="sm" className="h-7 gap-1.5 text-xs" onClick={() => onArtifactCreate('')}>
               <Plus className="h-3.5 w-3.5" />
               Add Artifact
             </Button>

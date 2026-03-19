@@ -108,6 +108,7 @@ export interface DataTableProps<T> {
   // ─── Empty states ──────────────────────────────────────────────────────
   emptyMessage?: string;
   filteredEmptyMessage?: string;
+  emptyContent?: ReactNode;
 
   // ─── Toolbar slots ─────────────────────────────────────────────────────
   /** Elements rendered at the right of the toolbar (always visible). */
@@ -152,6 +153,7 @@ export function DataTable<T>({
   activeFilterCount = 0,
   emptyMessage = 'No items yet',
   filteredEmptyMessage = 'No items match your filters',
+  emptyContent,
   toolbarRight,
   minWidth = 600,
 }: DataTableProps<T>) {
@@ -234,8 +236,8 @@ export function DataTable<T>({
 
   return (
     <div className="flex flex-col h-full" ref={tableRef}>
-      {/* Toolbar */}
-      <div className="flex items-center gap-1 border-b border-border/40 px-3 py-2">
+      {/* Toolbar — hidden when showing custom empty content */}
+      {items.length === 0 && !isFiltered && emptyContent ? null : <div className="flex items-center gap-1 border-b border-border/40 px-3 py-2">
         {/* View toggle — always far left */}
         <Tooltip>
           <TooltipTrigger asChild>
@@ -443,7 +445,7 @@ export function DataTable<T>({
             {toolbarRight}
           </div>
         )}
-      </div>
+      </div>}
 
       {/* Content */}
       {viewMode === 'grid' && renderGrid ? (
@@ -453,8 +455,8 @@ export function DataTable<T>({
       ) : (
         <ScrollArea className="flex-1">
           <div style={{ minWidth }}>
-            {/* Column header */}
-            <div
+            {/* Column header — hidden when showing custom empty content */}
+            {items.length === 0 && !isFiltered && emptyContent ? null : <div
               style={{ gridTemplateColumns: columnTemplate }}
               className="grid items-center border-b bg-muted/30 py-1.5 text-xs font-medium text-muted-foreground select-none"
             >
@@ -480,15 +482,22 @@ export function DataTable<T>({
                 </div>
               ))}
               {trailingWidth > 0 && <div />}
-            </div>
+            </div>}
 
             {/* Rows */}
             {items.length === 0 && !groups ? (
-              <div className="flex h-32 flex-col items-center justify-center gap-2 text-muted-foreground">
-                <p className="text-sm">
-                  {isFiltered ? filteredEmptyMessage : emptyMessage}
-                </p>
-              </div>
+              !isFiltered && emptyContent ? emptyContent : (
+                <div className="flex flex-col items-center pt-16 pb-8">
+                  <h3 className="text-lg font-semibold text-foreground mb-1.5">
+                    {isFiltered ? filteredEmptyMessage : emptyMessage}
+                  </h3>
+                  {!isFiltered && (
+                    <p className="text-[13px] text-muted-foreground/70 leading-relaxed max-w-[280px] text-center">
+                      Items will appear here once you start adding them.
+                    </p>
+                  )}
+                </div>
+              )
             ) : groups ? (
               groups.map(({ label, items: groupItems }) => (
                 <div key={label}>

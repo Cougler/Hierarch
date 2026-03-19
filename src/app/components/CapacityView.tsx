@@ -122,18 +122,52 @@ export function CapacityView({ projects, tasks, onProjectClick }: CapacityViewPr
   const totalWidth = weeks * WEEK_WIDTH;
 
   if (timedProjects.length === 0) {
+    const demoMonths = ['Mar', 'Apr', 'May', 'Jun']
+    const demoWeeks = [3, 10, 17, 24, 1, 8, 15, 22, 29, 6, 13, 20, 27, 3, 10, 17]
+    const demoProjects = [
+      { name: 'Mobile App Redesign', color: '#3b82f6', left: 0, width: 8 },
+      { name: 'Design System', color: '#8b5cf6', left: 2, width: 6 },
+      { name: 'Marketing Site', color: '#10b981', left: 5, width: 10 },
+    ]
     return (
-      <div className="flex h-full flex-col items-center justify-center gap-3 text-muted-foreground">
-        <svg className="h-12 w-12 opacity-30" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <rect x="3" y="4" width="18" height="18" rx="2" strokeWidth="1.5" />
-          <line x1="3" y1="9" x2="21" y2="9" strokeWidth="1.5" />
-          <line x1="8" y1="2" x2="8" y2="6" strokeWidth="1.5" strokeLinecap="round" />
-          <line x1="16" y1="2" x2="16" y2="6" strokeWidth="1.5" strokeLinecap="round" />
-        </svg>
-        <p className="text-sm font-medium">No project timelines yet</p>
-        <p className="text-xs text-center max-w-xs">
-          Open a project and set a start and end date to see it here.
-        </p>
+      <div className="flex h-full flex-col overflow-hidden">
+        <div className="flex-1 relative overflow-hidden flex flex-col items-center pt-16">
+          <h3 className="text-lg font-semibold text-foreground mb-2">No project timelines yet</h3>
+          <p className="text-[13px] text-muted-foreground/70 leading-relaxed max-w-[340px] text-center mb-8">
+            Open a project and set a start and end date to see your timelines here.
+          </p>
+          {/* Floating demo card */}
+          <div className="rounded-2xl border border-border/40 bg-card/30 backdrop-blur-sm shadow-lg overflow-hidden w-[680px] pointer-events-none select-none">
+            {/* Month headers */}
+            <div className="flex border-b border-border/30" style={{ height: 28 }}>
+              {demoMonths.map((m) => (
+                <div key={m} className="border-r border-border/20 px-3 flex items-center flex-1">
+                  <span className="text-[10px] font-semibold text-foreground/40 uppercase">{m}</span>
+                </div>
+              ))}
+            </div>
+            {/* Project rows */}
+            {demoProjects.map((p) => (
+              <div key={p.name} className="relative border-b border-border/10 last:border-b-0" style={{ height: 56 }}>
+                <div
+                  className="absolute"
+                  style={{
+                    left: `${(p.left / 16) * 100}%`,
+                    width: `${(p.width / 16) * 100}%`,
+                    top: '50%',
+                    transform: 'translateY(-50%)',
+                  }}
+                >
+                  <div className="flex items-center gap-1 px-1 mb-1">
+                    <div className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: p.color }} />
+                    <span className="text-[10px] font-medium truncate leading-none" style={{ color: p.color }}>{p.name}</span>
+                  </div>
+                  <div style={{ height: 18, borderRadius: 5, backgroundColor: `${p.color}18`, border: `1px solid ${p.color}50` }} />
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
       </div>
     );
   }

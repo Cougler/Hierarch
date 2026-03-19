@@ -4,7 +4,7 @@ import { useMemo, useState, useEffect } from 'react';
 import { cn } from '@/app/lib/utils';
 import { ScrollArea } from '@/app/components/ui/scroll-area';
 import { Popover, PopoverContent, PopoverTrigger } from '@/app/components/ui/popover';
-import { ChevronRight, ChevronDown, Folder, FileText } from 'lucide-react';
+import { ChevronRight, ChevronDown, Folder, FileText, Plus } from 'lucide-react';
 import { format, isToday, isBefore, startOfDay, subDays, formatDistanceToNow } from 'date-fns';
 import type { Task, StatusConfig, Project } from '@/app/types';
 import { PROJECT_PHASES } from '@/app/types';
@@ -132,7 +132,20 @@ export function ProjectDrawerContent({
           <div>
             <div className="flex items-center gap-3 mb-1">
               <IconComp className="h-4 w-4 text-muted-foreground/50 shrink-0" />
-              <h2 className="text-lg font-semibold text-foreground truncate">{project.name}</h2>
+              <input
+                defaultValue={project.name}
+                key={project.id}
+                onBlur={(e) => {
+                  const v = e.target.value.trim();
+                  if (v && v !== project.name) onProjectUpdate?.(project.id, { name: v });
+                  else e.target.value = project.name;
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === 'Escape') (e.target as HTMLInputElement).blur();
+                }}
+                className="flex-1 min-w-0 bg-transparent text-lg font-semibold text-foreground outline-none placeholder:text-muted-foreground/40 truncate"
+                placeholder="Project name"
+              />
             </div>
           </div>
 
@@ -248,21 +261,13 @@ export function ProjectDrawerContent({
           )}
 
           {/* Artifacts */}
-          <div>
-            <div className="flex items-center justify-between mb-2">
-              <h3 className="text-[11px] font-medium text-muted-foreground/70">
-                Artifacts
-              </h3>
-              <button
-                onClick={() => onArtifactCreate(project.id)}
-                className="text-[10px] text-primary hover:text-primary/80 transition-colors"
-              >
-                + Add
-              </button>
-            </div>
-            {projArtifacts.length > 0 ? (
-              <div className="overflow-hidden rounded-xl border border-border bg-muted/20">
-                {projArtifacts.slice(0, 5).map((note, i) => {
+          <div className="space-y-2">
+            <h3 className="text-[11px] font-medium text-muted-foreground/70">
+              Artifacts
+            </h3>
+            <div className="overflow-hidden rounded-xl border border-border bg-muted/20">
+              {projArtifacts.length > 0 ? (
+                projArtifacts.map((note, i) => {
                   const ArtifactIcon = ARTIFACT_TYPE_ICONS[note.type] || FileText;
                   const artifactColor = ARTIFACT_TYPE_COLORS[note.type] || 'text-muted-foreground';
                   return (
@@ -270,28 +275,29 @@ export function ProjectDrawerContent({
                       key={note.id}
                       onClick={() => onArtifactClick(note)}
                       className={cn(
-                        'w-full flex items-center gap-2.5 px-3 py-2.5 text-left transition-colors hover:bg-surface',
+                        'flex w-full items-center gap-2.5 px-3 py-2.5 text-left transition-colors hover:bg-surface',
                         i > 0 && 'border-t border-border/50',
                       )}
                     >
                       <ArtifactIcon className={cn('h-3.5 w-3.5 shrink-0', artifactColor)} />
-                      <div className="flex-1 min-w-0">
-                        <p className="text-xs text-foreground/80 truncate">
-                          {note.title || 'Untitled artifact'}
-                        </p>
-                      </div>
-                      <span className="text-[10px] text-muted-foreground/40 shrink-0">
-                        {isToday(new Date(note.updatedAt || note.timestamp))
-                          ? format(new Date(note.updatedAt || note.timestamp), 'h:mm a')
-                          : format(new Date(note.updatedAt || note.timestamp), 'MMM d')}
+                      <span className="flex-1 text-xs text-foreground/80 truncate">
+                        {note.title || 'Untitled artifact'}
                       </span>
+                      <ChevronRight className="h-3 w-3 text-muted-foreground/40 shrink-0" />
                     </button>
                   );
-                })}
+                })
+              ) : null}
+              <div className={cn(projArtifacts.length > 0 && 'border-t border-border/50')}>
+                <button
+                  onClick={() => onArtifactCreate(project.id)}
+                  className="flex w-full items-center gap-2 px-3 py-2.5 text-xs text-muted-foreground/40 transition-colors hover:text-muted-foreground"
+                >
+                  <Plus className="h-3 w-3" />
+                  Add artifact
+                </button>
               </div>
-            ) : (
-              <p className="text-xs text-muted-foreground/30 px-3 py-3">No artifacts yet</p>
-            )}
+            </div>
           </div>
         </div>
       </ScrollArea>

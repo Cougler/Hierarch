@@ -377,8 +377,8 @@ export function TaskBoard({
   // --- Render ---
   return (
     <div className="flex h-full flex-col">
-      {/* Toolbar */}
-      <div className="flex items-center gap-1 border-b border-border/40 px-3 py-2">
+      {/* Toolbar — hidden when no tasks exist */}
+      {tasks.length === 0 ? null : <div className="flex items-center gap-1 border-b border-border/40 px-3 py-2">
         {/* View toggle — always visible */}
         <Tooltip>
           <TooltipTrigger asChild>
@@ -694,7 +694,7 @@ export function TaskBoard({
 
           <Tooltip>
             <TooltipTrigger asChild>
-              <Button size="sm" className="h-7 gap-1.5 text-xs bg-[#bf7535] hover:bg-[#bf7535]/90" onClick={() => onNewTask ? onNewTask() : handleAddTask()}>
+              <Button size="sm" className="h-7 gap-1.5 text-xs " onClick={() => onNewTask ? onNewTask() : handleAddTask()}>
                 <Plus className="h-3.5 w-3.5" />
                 Add Task
               </Button>
@@ -704,7 +704,7 @@ export function TaskBoard({
             </TooltipContent>
           </Tooltip>
         </div>
-      </div>
+      </div>}
 
       {/* Content */}
       <div className="flex-1 overflow-hidden">
@@ -1016,8 +1016,8 @@ function ListView({
   return (
     <ScrollArea className="h-full">
       <div className="min-w-[600px]">
-        {/* Header */}
-        <div
+        {/* Header — hidden when no tasks */}
+        {tasks.length === 0 ? null : <div
           style={{ gridTemplateColumns: columnTemplate }}
           className="grid items-center border-b bg-muted/30 py-1.5 text-xs font-medium text-muted-foreground select-none"
         >
@@ -1042,7 +1042,7 @@ function ListView({
             Due Date
           </div>
           <div /> {/* more menu col */}
-        </div>
+        </div>}
 
         {/* Rows */}
         {taskGroups ? (
@@ -1060,16 +1060,15 @@ function ListView({
         )}
 
         {tasks.length === 0 && !inlineCreating && (
-          <div className="flex h-32 flex-col items-center justify-center gap-3 text-muted-foreground">
-            <p className="text-sm">No tasks yet</p>
-            <Button
-              size="sm"
-              className="h-7 gap-1.5 text-xs bg-[#bf7535] hover:bg-[#bf7535]/90"
-              onClick={() => onNewTask ? onNewTask() : onStartInline()}
-            >
-              <Plus className="h-3.5 w-3.5" />
-              Add Task
-            </Button>
+          <div className="flex flex-col items-center pt-12">
+            <h3 className="text-lg font-semibold text-foreground mb-1.5">No tasks yet</h3>
+            <p className="text-[13px] text-muted-foreground/70 leading-relaxed max-w-[280px] text-center mb-5">
+              Type below to create your first task.
+            </p>
+            <EmptyTaskInput onSave={onInlineSave} />
+            <div className="mt-8 w-[680px] max-w-full pointer-events-none select-none">
+              <img src="/tasksgraphic.webp" alt="" className="w-full rounded-xl" />
+            </div>
           </div>
         )}
 
@@ -1151,6 +1150,39 @@ function InlineTaskRow({
       {!hideProject && <div />} {/* project col */}
       <div /> {/* due col */}
       <div /> {/* more col */}
+    </div>
+  );
+}
+
+/* ─── Empty State Task Input ─── */
+
+function EmptyTaskInput({ onSave }: { onSave: (title: string) => void }) {
+  const [value, setValue] = useState('');
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    inputRef.current?.focus();
+  }, []);
+
+  return (
+    <div className="w-full max-w-[400px]">
+      <div className="flex items-center gap-2 rounded-lg border border-border/60 bg-surface px-3 py-2.5">
+        <Plus className="h-4 w-4 text-muted-foreground/40 shrink-0" />
+        <input
+          ref={inputRef}
+          value={value}
+          onChange={e => setValue(e.target.value)}
+          onKeyDown={e => {
+            if (e.key === 'Enter' && value.trim()) {
+              onSave(value.trim());
+              setValue('');
+            }
+          }}
+          placeholder="What are you working on?"
+          className="w-full bg-transparent text-sm text-foreground outline-none placeholder:text-muted-foreground/40"
+        />
+      </div>
+      <p className="text-[11px] text-muted-foreground/40 mt-2 text-center">Press Enter to create</p>
     </div>
   );
 }

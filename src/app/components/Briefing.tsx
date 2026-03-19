@@ -469,7 +469,7 @@ export function Briefing({
               {onStandupCreate && (
                 <Button
                   size="sm"
-                  className="h-9 gap-2 text-xs bg-primary text-primary-foreground hover:bg-primary/90"
+                  className="h-9 gap-2 text-xs"
                   onClick={() => {
                     const text = generateStandup(recentActivity, projects, statuses)
                     onStandupCreate(text)

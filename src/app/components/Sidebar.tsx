@@ -102,11 +102,8 @@ export function Sidebar({
   onClose,
 }: SidebarProps) {
   const { resolvedTheme, setTheme } = useTheme();
-  const [creatingProject, setCreatingProject] = useState(false);
-  const [newProjectName, setNewProjectName] = useState('');
   const [renameTarget, setRenameTarget] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState('');
-  const newProjectRef = useRef<HTMLInputElement>(null);
   const renameRef = useRef<HTMLInputElement>(null);
 
   const userName = user?.user_metadata?.name || user?.email?.split('@')[0] || 'User';
@@ -121,12 +118,6 @@ export function Sidebar({
   const hasAnyIntegration = hasLinear || hasFigma || hasJira;
 
   useEffect(() => {
-    if (creatingProject) {
-      setTimeout(() => newProjectRef.current?.focus(), 50);
-    }
-  }, [creatingProject]);
-
-  useEffect(() => {
     if (renameTarget) {
       setTimeout(() => {
         renameRef.current?.focus();
@@ -135,14 +126,15 @@ export function Sidebar({
     }
   }, [renameTarget]);
 
-  const handleNewProjectSubmit = () => {
-    const name = newProjectName.trim();
-    if (name) {
-      onProjectCreate(name);
-      toast.success('Project created');
-    }
-    setNewProjectName('');
-    setCreatingProject(false);
+  const handleNewProject = () => {
+    const name = 'Untitled Project';
+    onProjectCreate(name);
+    // Navigate after a tick so the project exists in state — use name lookup,
+    // App.tsx will resolve it to project ID
+    setTimeout(() => {
+      onViewChange(`project:${name}`);
+      onClose?.();
+    }, 50);
   };
 
   const handleRenameSubmit = () => {
@@ -176,7 +168,7 @@ export function Sidebar({
                 <FileText className="mr-2 h-4 w-4" /> New Artifact
               </DropdownMenuItem>
             )}
-            <DropdownMenuItem onClick={() => setCreatingProject(true)}>
+            <DropdownMenuItem onClick={handleNewProject}>
               <Plus className="mr-2 h-4 w-4" /> New Project
             </DropdownMenuItem>
           </DropdownMenuContent>
@@ -225,7 +217,7 @@ export function Sidebar({
             Projects
           </span>
           <button
-            onClick={() => setCreatingProject(true)}
+            onClick={handleNewProject}
             className="text-foreground/30 hover:text-foreground/60 transition-colors"
           >
             <Plus className="h-3.5 w-3.5" />
@@ -289,30 +281,11 @@ export function Sidebar({
             );
           })}
 
-          {/* Inline new project input */}
-          {creatingProject && (
-            <div className="flex items-center gap-2 px-3 py-1.5">
-              <Plus className="h-4 w-4 shrink-0 text-foreground/30" />
-              <Input
-                ref={newProjectRef}
-                value={newProjectName}
-                placeholder="Project name"
-                onChange={e => setNewProjectName(e.target.value)}
-                onKeyDown={e => {
-                  if (e.key === 'Enter') handleNewProjectSubmit();
-                  if (e.key === 'Escape') { setCreatingProject(false); setNewProjectName(''); }
-                }}
-                onBlur={handleNewProjectSubmit}
-                className="h-6 text-sm bg-surface border-border px-1.5 py-0 placeholder:text-foreground/30"
-              />
-            </div>
-          )}
-
-          {realProjects.length === 0 && !creatingProject && (
+          {realProjects.length === 0 && (
             <div className="px-3 py-3 space-y-2">
               <p className="text-xs text-foreground/30">Your projects will appear here</p>
               <button
-                onClick={() => setCreatingProject(true)}
+                onClick={handleNewProject}
                 className="flex items-center gap-1.5 text-xs text-primary hover:text-primary/80 transition-colors"
               >
                 <Plus className="h-3 w-3" />

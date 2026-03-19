@@ -264,6 +264,19 @@ export default function App() {
     return () => subscription.unsubscribe()
   }, [])
 
+  // Redirect stale project views after a delay (handles ID swaps, renames, deletions)
+  useEffect(() => {
+    if (!activeView.startsWith('project:')) return
+    const ref = activeView.replace('project:', '')
+    const found = projects.find(p => p.id === ref || p.name === ref)
+    if (found) return
+    const timer = setTimeout(() => {
+      const stillMissing = !projects.find(p => p.id === ref || p.name === ref)
+      if (stillMissing) setActiveView('today')
+    }, 500)
+    return () => clearTimeout(timer)
+  }, [activeView, projects])
+
   // Handle OAuth callbacks
   useEffect(() => {
     const path = window.location.pathname
@@ -1048,7 +1061,7 @@ export default function App() {
           onStatusesChange={setStatuses}
           onNewTask={() => handleOpenNewTask()}
           onStartFocus={(task: Task) => { setFocusTask(task); setActiveView('focus'); }}
-          onCreateNote={(task: Task) => handleArtifactCreate(task.project || '')}
+          onCreateNote={(task: Task) => handleArtifactCreateForTask(task.id)}
           focusTaskId={focusTask?.id}
           projectFilter={undefined}
         />
@@ -1058,7 +1071,7 @@ export default function App() {
     if (activeView.startsWith('project:')) {
       const projectRef = activeView.replace('project:', '')
       const project = projects.find(p => p.id === projectRef || p.name === projectRef)
-      if (!project) return <div className="p-8 text-muted-foreground">Project not found</div>
+      if (!project) return null
 
       const projectTasks = tasks.filter(t => t.project === project.id || t.project === project.name)
 
@@ -1075,7 +1088,9 @@ export default function App() {
           onTaskDelete={handleTaskDelete}
           onTaskClick={handleTaskClick}
           onStatusesChange={setStatuses}
-          onCreateNote={(task: Task) => handleArtifactCreate(task.project || '')}
+          onCreateNote={(task: Task) => handleArtifactCreateForTask(task.id)}
+          onProjectDelete={(id) => { handleProjectDelete(id); setActiveView('today') }}
+          onViewChange={setActiveView}
         />
       )
     }
@@ -1147,6 +1162,8 @@ export default function App() {
       )
     }
 
+    // Unknown view — redirect to overview
+    setTimeout(() => setActiveView('today'), 0)
     return null
   }
 
