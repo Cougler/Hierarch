@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { ArrowRight } from 'lucide-react';
+import { ArrowRight, ArrowLeft } from 'lucide-react';
 import { supabase } from '@/app/supabase-client';
 import { cn } from '@/app/lib/utils';
 import * as DialogPrimitive from '@radix-ui/react-dialog';
@@ -46,7 +46,7 @@ const slides: SlideData[] = [
     image: '/page2.webp',
     content: (
       <p className="text-sm text-white/80 leading-relaxed">
-        <strong className={AMBER}>Projects</strong> move through design phases
+        <strong className={AMBER}>Projects</strong> flow through design phases. Jump between them freely, the way real design work moves
       </p>
     ),
   },
@@ -74,12 +74,13 @@ const slides: SlideData[] = [
   {
     layout: 'text-top',
     image: '/page5.webp',
-    textClassName: 'pt-[calc(var(--spacing)*30)] max-w-[550px]',
+    textClassName: 'pt-[calc(var(--spacing)*30)] max-w-[850px]',
     content: (
       <p className="text-base text-white/80 leading-relaxed">
         The <strong className={AMBER}>Overview</strong> page preps you for stand-up each day, showing{' '}
         <strong className={AMBER}>active projects</strong> that contain tasks and a 48 hour recap of{' '}
-        <strong className={AMBER}>recent progress</strong>.
+        <strong className={AMBER}>recent progress</strong>. Hit the{' '}
+        <strong className={AMBER}>Standup</strong> button to generate a ready-to-read summary of what you worked on yesterday.
       </p>
     ),
   },
@@ -127,7 +128,16 @@ export default function Onboarding({ onComplete, demoMode }: OnboardingProps) {
           <div className="relative flex flex-col h-full">
             {/* Top bar */}
             <div className="absolute top-0 left-0 right-0 z-20 flex items-center justify-between px-8 pt-5">
-              <div className="w-24" />
+              <div className="w-24">
+                {step > 0 && (
+                  <button
+                    onClick={() => setStep(s => s - 1)}
+                    className="text-sm font-light text-white/60 hover:text-white/80 transition-colors"
+                  >
+                    Back
+                  </button>
+                )}
+              </div>
               <div className="flex gap-1.5">
                 {Array.from({ length: TOTAL_STEPS }).map((_, i) => (
                   <div
@@ -141,7 +151,7 @@ export default function Onboarding({ onComplete, demoMode }: OnboardingProps) {
               </div>
               <button
                 onClick={handleComplete}
-                className={cn('text-sm font-medium hover:opacity-80 transition-opacity', AMBER)}
+                className="text-sm font-light text-white/60 hover:text-white/80 transition-colors"
               >
                 Skip
               </button>
@@ -203,6 +213,7 @@ export default function Onboarding({ onComplete, demoMode }: OnboardingProps) {
             {/* Next / Get started button */}
             {isLast ? (
               <button
+                autoFocus
                 onClick={handleComplete}
                 className="absolute right-6 top-1/2 -translate-y-1/2 z-20 flex items-center gap-2 rounded-full bg-[#bf7535] px-5 py-3 text-sm font-medium text-white hover:bg-[#bf7535]/90 transition-colors shadow-lg"
               >
@@ -211,6 +222,7 @@ export default function Onboarding({ onComplete, demoMode }: OnboardingProps) {
               </button>
             ) : (
               <button
+                autoFocus
                 onClick={() => setStep(s => s + 1)}
                 className="absolute right-6 top-1/2 -translate-y-1/2 z-20 flex h-12 w-12 items-center justify-center rounded-full bg-[#bf7535] text-white hover:bg-[#bf7535]/90 transition-colors shadow-lg"
               >

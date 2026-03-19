@@ -494,9 +494,19 @@ export function Briefing({
                 </div>
 
                 {!hasActiveProjects ? (
-                  <div className="rounded-xl border border-border/30 bg-card/20 px-5 py-10 text-center space-y-3">
-                    <Folder className="h-6 w-6 mx-auto text-muted-foreground/30" />
-                    <p className="text-sm text-muted-foreground">Projects you're working on will show up here with their tasks and status.</p>
+                  <div className="rounded-xl border border-border/30 bg-card/20 px-8 py-14 flex flex-col items-center text-center">
+                    <div className="relative mb-6">
+                      <div className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center">
+                        <Folder className="h-7 w-7 text-primary/40" />
+                      </div>
+                      <div className="absolute -bottom-1.5 -right-1.5 w-7 h-7 rounded-lg bg-emerald-500/15 flex items-center justify-center">
+                        <Plus className="h-3.5 w-3.5 text-emerald-500/60" />
+                      </div>
+                    </div>
+                    <h3 className="text-sm font-medium text-foreground mb-1.5">No active projects yet</h3>
+                    <p className="text-xs text-muted-foreground/70 leading-relaxed max-w-[280px] mb-5">
+                      Create a project and add tasks to see your work organized here with statuses and progress tracking.
+                    </p>
                     {onProjectCreate && (
                       <Button
                         variant="outline"

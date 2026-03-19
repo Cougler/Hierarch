@@ -2,6 +2,6 @@
   "description": "React task management app with drag-and-drop, focus timer, and today view",
   "status": "active",
   "stack": ["React", "TypeScript", "Tailwind CSS", "shadcn/ui", "Supabase"],
-  "url": "https://hierarch.vercel.app",
-  "notes": "The Overview page has a full-height Recent Progress panel that shows an immutable event ledger from Linear webhooks (via Supabase Realtime), local task/project activity, and Figma comments. Linear webhook pipeline is live: edge function receives events, stores them in linear_events table, and the client auto-updates via Supabase Realtime subscriptions. This session also unified all status/phase selectors, redesigned the Linear issue drawer to use the standard floating drawer shell, added assignee picker and team members API, renamed task Feedback status to Review, and polished the Briefing layout. Next: Jira integration (same webhook pattern), re-enable Linear webhook signature verification, and submit Figma app for review."
+  "url": "https://hierarchical.app",
+  "notes": "Jira integration is live with full OAuth, API proxy, webhook events, and JiraView matching the Linear pattern. Overview now has a Standup button that generates a plain-language activity summary as a doc artifact. Recent Progress feed supports right-click dismiss and cleaned up timestamps. Next: re-enable Linear webhook HMAC verification, submit Figma app for review, and build Insights view."
 }
