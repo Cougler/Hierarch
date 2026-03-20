@@ -438,6 +438,8 @@ export default function App() {
   }
 
   const loadTimeEntries = async () => {
+    // Disabled: Deno KV is broken on Supabase Edge Functions, causing 500 errors on every load
+    return
     try {
       const session = await supabase.auth.getSession()
       const token = session.data.session?.access_token

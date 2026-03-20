@@ -808,8 +808,10 @@ app.get("/jira/authorize", async (c) => {
 
   const state = crypto.randomUUID()
 
-  const origin = c.req.header("Origin") || c.req.header("Referer")?.replace(/\/$/, "") || "http://localhost:3000"
+  const rawOrigin = c.req.header("Origin") || c.req.header("Referer") || "http://localhost:3000"
+  const origin = new URL(rawOrigin).origin
   const redirectUri = getJiraRedirectUri(origin)
+  console.log("Jira authorize origin:", origin, "redirect_uri:", redirectUri)
 
   const params = new URLSearchParams({
     audience: "api.atlassian.com",
@@ -1145,6 +1147,80 @@ app.post("/jira/webhook", async (c) => {
     return c.json({ success: true })
   } catch (e) {
     console.error("Jira webhook error:", e)
+    return c.json({ error: String(e) }, 500)
+  }
+})
+
+// ─── Jira Personal Data Reporting API ────────────────────────────────
+
+// POST /jira/personal-data — Reports what personal data we store for a given accountId
+app.post("/jira/personal-data", async (c) => {
+  try {
+    const { accountId } = await c.req.json<{ accountId: string }>()
+    if (!accountId) return c.json({ error: "accountId required" }, 400)
+
+    // Check if we store any data for this accountId
+    const { data: integration } = await supabaseAdmin
+      .from("integrations")
+      .select("id, provider_user_id, provider_metadata")
+      .eq("provider", "jira")
+      .eq("provider_user_id", accountId)
+      .maybeSingle()
+
+    // Check jira_events for any references to this accountId
+    const { data: events } = await supabaseAdmin
+      .from("jira_events")
+      .select("id")
+      .or(`actor_id.eq.${accountId},assignee_id.eq.${accountId}`)
+      .limit(1)
+
+    const personalData: { type: string; description: string }[] = []
+
+    if (integration) {
+      personalData.push({
+        type: "integration_record",
+        description: "OAuth integration record containing accountId, display name, email, and avatar URL. Stored to maintain the Jira connection.",
+      })
+    }
+
+    if (events && events.length > 0) {
+      personalData.push({
+        type: "webhook_events",
+        description: "Jira webhook event records that may contain accountId, display name as actor or assignee. Events are automatically deleted after 15 days.",
+      })
+    }
+
+    return c.json({
+      accountId,
+      personalDataStored: personalData.length > 0,
+      data: personalData,
+    })
+  } catch (e) {
+    return c.json({ error: String(e) }, 500)
+  }
+})
+
+// DELETE /jira/personal-data — Deletes all personal data for a given accountId
+app.delete("/jira/personal-data", async (c) => {
+  try {
+    const { accountId } = await c.req.json<{ accountId: string }>()
+    if (!accountId) return c.json({ error: "accountId required" }, 400)
+
+    // Delete integration record
+    await supabaseAdmin
+      .from("integrations")
+      .delete()
+      .eq("provider", "jira")
+      .eq("provider_user_id", accountId)
+
+    // Delete webhook events referencing this user
+    await supabaseAdmin
+      .from("jira_events")
+      .delete()
+      .or(`actor_id.eq.${accountId},assignee_id.eq.${accountId}`)
+
+    return c.json({ accountId, deleted: true })
+  } catch (e) {
     return c.json({ error: String(e) }, 500)
   }
 })
