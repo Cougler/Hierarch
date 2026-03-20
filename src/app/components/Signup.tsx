@@ -150,7 +150,7 @@ export default function Signup({ onSignup, onSwitchToLogin }: SignupProps) {
                     placeholder="Jane Doe"
                     value={name}
                     onChange={(e) => setName(e.target.value)}
-                    className="border-white/10 bg-white/5 pl-10 text-white placeholder:text-gray-500 focus-visible:ring-teal-500"
+                    className="border-white/10 bg-white/5 pl-10 text-white placeholder:text-gray-500 focus-visible:ring-primary"
                     autoComplete="name"
                   />
                 </div>
@@ -166,7 +166,7 @@ export default function Signup({ onSignup, onSwitchToLogin }: SignupProps) {
                     placeholder="you@example.com"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    className="border-white/10 bg-white/5 pl-10 text-white placeholder:text-gray-500 focus-visible:ring-teal-500"
+                    className="border-white/10 bg-white/5 pl-10 text-white placeholder:text-gray-500 focus-visible:ring-primary"
                     autoComplete="email"
                   />
                 </div>
@@ -182,7 +182,7 @@ export default function Signup({ onSignup, onSwitchToLogin }: SignupProps) {
                     placeholder="••••••••"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    className="border-white/10 bg-white/5 pl-10 text-white placeholder:text-gray-500 focus-visible:ring-teal-500"
+                    className="border-white/10 bg-white/5 pl-10 text-white placeholder:text-gray-500 focus-visible:ring-primary"
                     autoComplete="new-password"
                   />
                 </div>
@@ -194,7 +194,7 @@ export default function Signup({ onSignup, onSwitchToLogin }: SignupProps) {
               <Button
                 type="submit"
                 disabled={loading}
-                className="w-full bg-teal-500 text-white hover:bg-teal-600 disabled:opacity-50"
+                className="w-full disabled:opacity-50"
                 size="lg"
               >
                 {loading ? (
@@ -213,8 +213,8 @@ export default function Signup({ onSignup, onSwitchToLogin }: SignupProps) {
                   type="button"
                   onClick={onSwitchToLogin}
                   className={cn(
-                    'font-medium text-teal-400 underline-offset-4 transition-colors',
-                    'hover:text-teal-300 hover:underline'
+                    'font-medium text-primary underline-offset-4 transition-colors',
+                    'hover:text-primary/80 hover:underline'
                   )}
                 >
                   Sign in

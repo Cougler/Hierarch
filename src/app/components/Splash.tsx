@@ -9,7 +9,7 @@ export default function Splash({ message = 'Loading Workspace...' }: SplashProps
   return (
     <div className="flex min-h-screen flex-col items-center justify-center bg-gray-950">
       <div className="pointer-events-none absolute inset-0 overflow-hidden">
-        <div className="absolute left-1/2 top-1/2 h-[400px] w-[400px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-teal-500/8 blur-[120px]" />
+        <div className="absolute left-1/2 top-1/2 h-[400px] w-[400px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-primary/8 blur-[120px]" />
       </div>
 
       <motion.div
@@ -29,7 +29,7 @@ export default function Splash({ message = 'Loading Workspace...' }: SplashProps
 
         <div className="flex flex-col items-center gap-4">
           <motion.div
-            className="h-8 w-8 rounded-full border-2 border-teal-400/30 border-t-teal-400"
+            className="h-8 w-8 rounded-full border-2 border-primary/30 border-t-primary"
             animate={{ rotate: 360 }}
             transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
           />

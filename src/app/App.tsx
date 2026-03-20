@@ -50,7 +50,9 @@ export default function App() {
   const isMobile = useIsMobile()
 
   const [authState, setAuthState] = useState<AuthState>('loading')
-  const [authView, setAuthView] = useState<AuthView>('login')
+  const [authView, setAuthView] = useState<AuthView>(
+    window.location.pathname === '/signup' ? 'signup' : 'login'
+  )
   const [user, setUser] = useState<any>(null)
 
   const [activeView, setActiveView] = useState('today')
@@ -1179,11 +1181,11 @@ export default function App() {
         <AnimatePresence mode="wait">
           {authView === 'login' ? (
             <motion.div key="login" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-              <Login onLogin={handleLogin} onSwitchToSignup={() => setAuthView('signup')} onDemoLogin={handleDemoLogin} />
+              <Login onLogin={handleLogin} onSwitchToSignup={() => { setAuthView('signup'); window.history.replaceState({}, '', '/signup') }} onDemoLogin={handleDemoLogin} />
             </motion.div>
           ) : (
             <motion.div key="signup" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-              <Signup onSignup={handleLogin} onSwitchToLogin={() => setAuthView('login')} />
+              <Signup onSignup={handleLogin} onSwitchToLogin={() => { setAuthView('login'); window.history.replaceState({}, '', '/') }} />
             </motion.div>
           )}
         </AnimatePresence>
