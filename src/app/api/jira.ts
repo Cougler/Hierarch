@@ -149,12 +149,19 @@ export async function getStatuses(token: string, cloudId: string, projectKey: st
   return statuses
 }
 
-export async function getIssues(token: string, cloudId: string, projectKey: string): Promise<JiraIssue[]> {
+export async function getIssues(token: string, cloudId: string, projectKey?: string): Promise<JiraIssue[]> {
+  const jql = projectKey
+    ? `project=${projectKey} AND assignee=currentUser() ORDER BY updated DESC`
+    : `assignee=currentUser() ORDER BY updated DESC`
   const data = await jiraProxy<{ issues: JiraIssue[] }>(
     token, cloudId,
-    `/rest/api/3/search/jql?jql=${encodeURIComponent(`project=${projectKey} ORDER BY updated DESC`)}&fields=summary,status,assignee,priority,issuetype,labels,created,updated&maxResults=100`
+    `/rest/api/3/search/jql?jql=${encodeURIComponent(jql)}&fields=summary,status,assignee,priority,issuetype,labels,created,updated&maxResults=100`
   )
   return data.issues
+}
+
+export async function getMyIssues(token: string, cloudId: string): Promise<JiraIssue[]> {
+  return getIssues(token, cloudId)
 }
 
 export async function getIssue(token: string, cloudId: string, issueKey: string): Promise<JiraIssue> {

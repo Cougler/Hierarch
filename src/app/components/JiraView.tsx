@@ -579,29 +579,22 @@ function CreateIssueDialog({
 function JiraBoard({
   token,
   cloudId,
-  project,
   onDisconnect,
 }: {
   token: string
   cloudId: string
-  project: JiraProject
   onDisconnect: () => void
 }) {
   const [issues, setIssues] = useState<JiraIssue[]>([])
   const [members, setMembers] = useState<JiraUser[]>([])
   const [loading, setLoading] = useState(true)
   const [selectedIssue, setSelectedIssue] = useState<JiraIssue | null>(null)
-  const [showCreate, setShowCreate] = useState(false)
   const [refreshing, setRefreshing] = useState(false)
 
   const load = useCallback(async () => {
     try {
-      const iss = await jiraApi.getIssues(token, cloudId, project.key)
+      const iss = await jiraApi.getMyIssues(token, cloudId)
       setIssues(iss)
-      // Members fetch is non-fatal (some Jira plans restrict this endpoint)
-      jiraApi.getProjectMembers(token, cloudId, project.key)
-        .then(mems => setMembers(mems))
-        .catch(() => {})
     } catch (err) {
       console.error('Jira load error:', err)
       toast.error(`Failed to load issues: ${err instanceof Error ? err.message : 'Unknown error'}`)
@@ -609,7 +602,7 @@ function JiraBoard({
       setLoading(false)
       setRefreshing(false)
     }
-  }, [token, cloudId, project.key])
+  }, [token, cloudId])
 
   useEffect(() => { load() }, [load])
 
@@ -654,17 +647,13 @@ function JiraBoard({
           <div className="w-6 h-6 rounded bg-[#0052CC]/20 flex items-center justify-center">
             <Layers className="h-3.5 w-3.5 text-[#0052CC]" />
           </div>
-          <span className="font-semibold text-sm">{project.name}</span>
-          <span className="text-xs text-muted-foreground font-mono">{project.key}</span>
+          <span className="font-semibold text-sm">My Issues</span>
+          <span className="text-xs text-muted-foreground">Jira</span>
         </div>
 
         <div className="flex items-center gap-2">
           <Button variant="ghost" size="icon" className="h-8 w-8" onClick={handleRefresh} disabled={refreshing}>
             <RefreshCw className={cn('h-4 w-4', refreshing && 'animate-spin')} />
-          </Button>
-          <Button variant="outline" size="sm" className="gap-1.5 h-8" onClick={() => setShowCreate(true)}>
-            <Plus className="h-3.5 w-3.5" />
-            New Issue
           </Button>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
@@ -792,53 +781,6 @@ function JiraBoard({
           onUpdate={handleIssueUpdate}
         />
       )}
-
-      {/* Create dialog */}
-      {showCreate && (
-        <CreateIssueDialog
-          token={token}
-          cloudId={cloudId}
-          projectKey={project.key}
-          onClose={() => setShowCreate(false)}
-          onCreate={handleIssueCreate}
-        />
-      )}
-    </div>
-  )
-}
-
-// ── Project Selector ────────────────────────────────────────────────────────
-
-function ProjectSelector({
-  projects,
-  onSelect,
-}: {
-  projects: JiraProject[]
-  onSelect: (project: JiraProject) => void
-}) {
-  return (
-    <div className="flex flex-col items-center justify-center h-full min-h-[400px] gap-6 px-4">
-      <div className="text-center">
-        <h2 className="text-lg font-semibold mb-1">Select a Project</h2>
-        <p className="text-sm text-muted-foreground">Choose which Jira project to view</p>
-      </div>
-      <div className="flex flex-col gap-2 w-full max-w-xs">
-        {projects.map(project => (
-          <button
-            key={project.id}
-            onClick={() => onSelect(project)}
-            className="flex items-center gap-3 px-4 py-3 rounded-lg border border-border hover:border-[#0052CC]/50 hover:bg-accent/30 transition-all text-left"
-          >
-            <div className="w-8 h-8 rounded-lg bg-[#0052CC]/20 flex items-center justify-center text-sm font-bold text-[#0052CC]">
-              {project.key[0]}
-            </div>
-            <div>
-              <span className="font-medium block">{project.name}</span>
-              <span className="text-xs text-muted-foreground font-mono">{project.key}</span>
-            </div>
-          </button>
-        ))}
-      </div>
     </div>
   )
 }
@@ -847,39 +789,9 @@ function ProjectSelector({
 
 export function JiraView() {
   const { token, isConnected, isLoading, cloudId, disconnect } = useJiraToken()
-  const [projects, setProjects] = useState<JiraProject[]>([])
-  const [selectedProject, setSelectedProject] = useState<JiraProject | null>(() => {
-    const saved = localStorage.getItem(PROJECT_KEY)
-    return saved ? JSON.parse(saved) : null
-  })
-  const [loadingProjects, setLoadingProjects] = useState(false)
-
-  useEffect(() => {
-    if (!token || !cloudId) return
-    if (selectedProject) return
-    setLoadingProjects(true)
-    jiraApi.getProjects(token, cloudId)
-      .then(p => {
-        setProjects(p)
-        if (p.length === 1) {
-          setSelectedProject(p[0] ?? null)
-          localStorage.setItem(PROJECT_KEY, JSON.stringify(p[0]))
-        }
-      })
-      .catch(() => toast.error('Failed to load Jira projects'))
-      .finally(() => setLoadingProjects(false))
-  }, [token, cloudId, selectedProject])
-
-  const handleProjectSelect = (project: JiraProject) => {
-    setSelectedProject(project)
-    localStorage.setItem(PROJECT_KEY, JSON.stringify(project))
-  }
 
   const handleDisconnect = async () => {
     await disconnect()
-    localStorage.removeItem(PROJECT_KEY)
-    setSelectedProject(null)
-    setProjects([])
     toast.success('Disconnected from Jira')
   }
 
@@ -899,24 +811,10 @@ export function JiraView() {
     </div>
   )
 
-  if (loadingProjects) {
-    return (
-      <div className="flex items-center justify-center h-full min-h-[400px] gap-2 text-muted-foreground">
-        <Loader2 className="h-5 w-5 animate-spin" />
-        <span className="text-sm">Connecting…</span>
-      </div>
-    )
-  }
-
-  if (!selectedProject) {
-    return <ProjectSelector projects={projects} onSelect={handleProjectSelect} />
-  }
-
   return (
     <JiraBoard
       token={token}
       cloudId={cloudId}
-      project={selectedProject}
       onDisconnect={handleDisconnect}
     />
   )
