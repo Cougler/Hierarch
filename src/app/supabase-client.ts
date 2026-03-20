@@ -9,5 +9,13 @@ if (!supabaseUrl || !supabaseAnonKey) {
 
 export const supabase = createClient(
   supabaseUrl || 'https://placeholder.supabase.co',
-  supabaseAnonKey || 'placeholder-key'
+  supabaseAnonKey || 'placeholder-key',
+  {
+    realtime: {
+      params: {
+        eventsPerSecond: 0,
+      },
+    },
+    // Disable automatic Realtime connection (re-enable after Supabase Pro upgrade)
+  }
 );

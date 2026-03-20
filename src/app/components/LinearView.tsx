@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { supabase } from '../supabase-client'
+
 import { formatDistanceToNow } from 'date-fns'
 import { motion } from 'motion/react'
 import { toast } from 'sonner'
@@ -699,19 +699,6 @@ function LinearBoard({
   }, [token, team.id])
 
   useEffect(() => { load() }, [load])
-
-  // Subscribe to Realtime for live updates from Linear webhooks
-  useEffect(() => {
-    const channel = supabase
-      .channel('linear-view-events')
-      .on('postgres_changes', {
-        event: 'INSERT',
-        schema: 'public',
-        table: 'linear_events',
-      }, () => { load() })
-      .subscribe()
-    return () => { supabase.removeChannel(channel) }
-  }, [load])
 
   const handleRefresh = () => { setRefreshing(true); load() }
 

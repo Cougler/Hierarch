@@ -135,18 +135,6 @@ export default function App() {
     }
 
     fetchEvents()
-
-    // Subscribe to Realtime for live updates
-    const channel = supabase
-      .channel('linear-events-feed')
-      .on('postgres_changes', {
-        event: 'INSERT',
-        schema: 'public',
-        table: 'linear_events',
-      }, () => { fetchEvents() })
-      .subscribe()
-
-    return () => { supabase.removeChannel(channel) }
   }, [linearToken.isConnected])
 
   // Fetch recent Figma comments mentioning user
@@ -187,17 +175,6 @@ export default function App() {
     }
 
     fetchEvents()
-
-    const channel = supabase
-      .channel('jira-events-feed')
-      .on('postgres_changes', {
-        event: 'INSERT',
-        schema: 'public',
-        table: 'jira_events',
-      }, () => { fetchEvents() })
-      .subscribe()
-
-    return () => { supabase.removeChannel(channel) }
   }, [jiraToken.isConnected])
 
   const tempIdMapping = useRef<Record<string, string>>({})
