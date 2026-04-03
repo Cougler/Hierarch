@@ -24,7 +24,7 @@ export function useColumnWidths() {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(widths));
   }, [widths]);
 
-  const columnTemplate = `40px ${widths.title}px ${widths.project}px ${widths.due}px 64px`;
+  const columnTemplate = `40px minmax(0, ${widths.title}px) minmax(0, ${widths.project}px) minmax(0, ${widths.due}px) 64px`;
 
   const dragging = useRef<{ col: keyof ColWidths; startX: number; startWidth: number } | null>(null);
 

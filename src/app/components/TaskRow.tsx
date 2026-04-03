@@ -152,7 +152,7 @@ export function TaskRow({
         </div>
 
         {/* Title */}
-        <div className="min-w-0 px-2 py-2 flex items-center gap-2">
+        <div className="min-w-0 px-2 py-1 flex items-center gap-2">
           <div onClick={(e) => e.stopPropagation()}>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
@@ -188,7 +188,7 @@ export function TaskRow({
 
         {/* Project */}
         {!hideProject && (
-          <div className="min-w-0 overflow-hidden px-2 py-2" onClick={(e) => e.stopPropagation()}>
+          <div className="min-w-0 overflow-hidden px-2 py-1" onClick={(e) => e.stopPropagation()}>
             <ProjectCell
               project={task.project}
               projects={projects}
@@ -198,7 +198,7 @@ export function TaskRow({
         )}
 
         {/* Due date */}
-        <div className="px-1 py-2" onClick={(e) => e.stopPropagation()}>
+        <div className="px-1 py-1" onClick={(e) => e.stopPropagation()}>
           <DueDateCell
             date={task.dueDate}
             onChange={(dueDate) => onUpdate(task.id, { dueDate })}

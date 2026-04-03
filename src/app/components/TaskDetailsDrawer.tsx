@@ -188,7 +188,10 @@ export function TaskDetailsDrawer({
   const [newBlockerType, setNewBlockerType] = useState<BlockerType>('person');
   const [newBlockerOwner, setNewBlockerOwner] = useState('');
   const [showResolved, setShowResolved] = useState(false);
-  const titleRef = useRef<HTMLInputElement>(null);
+  const titleRef = useRef<HTMLTextAreaElement>(null);
+  const [titleLength, setTitleLength] = useState(task?.title?.length ?? 0);
+
+  const titleFontSize = titleLength < 40 ? 24 : titleLength < 80 ? 20 : titleLength < 140 ? 17 : 15;
 
   const update = useCallback(
     (updates: Partial<Task>) => {
@@ -206,6 +209,23 @@ export function TaskDetailsDrawer({
       setShowResolved(false);
     }
   }, [open]);
+
+  // Auto-size title textarea on mount / task change
+  useEffect(() => {
+    setTitleLength(task?.title?.length ?? 0);
+    if (titleRef.current) {
+      titleRef.current.style.height = 'auto';
+      titleRef.current.style.height = `${titleRef.current.scrollHeight}px`;
+    }
+  }, [task?.id]);
+
+  // Re-measure height after font size changes
+  useEffect(() => {
+    if (titleRef.current) {
+      titleRef.current.style.height = 'auto';
+      titleRef.current.style.height = `${titleRef.current.scrollHeight}px`;
+    }
+  }, [titleFontSize]);
 
   const activeBlockers = useMemo(() => (task?.blockers ?? []).filter(b => !b.resolvedAt), [task?.blockers]);
   const resolvedBlockers = useMemo(() => (task?.blockers ?? []).filter(b => b.resolvedAt), [task?.blockers]);
@@ -256,17 +276,25 @@ export function TaskDetailsDrawer({
       <ScrollArea className="flex-1 min-h-0">
         <div className="space-y-5 px-5 pb-5 pt-3">
           {/* Title */}
-          <Input
+          <Textarea
             ref={titleRef}
             defaultValue={task.title}
+            rows={1}
+            style={{ fontSize: titleFontSize, lineHeight: 1.3 }}
+            onInput={(e) => {
+              const el = e.target as HTMLTextAreaElement;
+              setTitleLength(el.value.length);
+              el.style.height = 'auto';
+              el.style.height = `${el.scrollHeight}px`;
+            }}
             onBlur={(e) => {
               const v = e.target.value.trim();
               if (v && v !== task.title) update({ title: v });
             }}
             onKeyDown={(e) => {
-              if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
+              if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); (e.target as HTMLTextAreaElement).blur(); }
             }}
-            className="border-0 bg-transparent px-0 text-lg font-semibold shadow-none focus-visible:ring-0 placeholder:text-muted-foreground/40"
+            className="border-0 bg-transparent px-0 font-semibold shadow-none focus-visible:ring-0 placeholder:text-muted-foreground/40 resize-none overflow-hidden min-h-0"
           />
 
           {/* Phase */}

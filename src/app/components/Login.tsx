@@ -71,30 +71,29 @@ export default function Login({ onLogin, onSwitchToSignup, onDemoLogin }: LoginP
   return (
     <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-background px-4">
       <motion.div
-        initial={{ opacity: 0, y: 24 }}
+        initial={{ opacity: 0, y: 16 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5, ease: 'easeOut' }}
-        className="relative z-10 w-full max-w-md"
+        transition={{ duration: 0.4, ease: 'easeOut' }}
+        className="relative z-10 w-full max-w-xs"
       >
         {/* Branding */}
-        <div className="mb-8 text-center">
-          <div className="mb-3 inline-flex items-center gap-2">
-            <img src="/logo.svg" className="h-8 w-8" alt="Hierarch" />
-            <h1 className="text-4xl font-bold tracking-tight text-foreground">Hierarch</h1>
+        <div className="mb-5 text-center">
+          <div className="mb-1.5 inline-flex items-center gap-2">
+            <img src="/logo.svg" className="h-6 w-6" alt="Hierarch" />
+            <h1 className="text-2xl font-bold tracking-tight text-foreground">Hierarch</h1>
           </div>
-          <p className="text-sm text-muted-foreground">Build today, ship tomorrow.</p>
+          <p className="text-xs text-muted-foreground">Build today, ship tomorrow.</p>
         </div>
 
         <Card className="border-border bg-card">
           {/* Google OAuth */}
-          <div className="px-6 pt-6 pb-4">
+          <div className="px-5 pt-5 pb-3">
             <Button
               type="button"
               onClick={handleGoogleSignIn}
               disabled={googleLoading}
               className="w-full"
               variant="outline"
-              size="lg"
             >
               {googleLoading ? (
                 <Loader2 className="h-4 w-4 animate-spin" />
@@ -104,7 +103,7 @@ export default function Login({ onLogin, onSwitchToSignup, onDemoLogin }: LoginP
               Continue with Google
             </Button>
 
-            <div className="relative my-4">
+            <div className="relative my-3">
               <div className="absolute inset-0 flex items-center">
                 <div className="w-full border-t border-border" />
               </div>
@@ -115,39 +114,34 @@ export default function Login({ onLogin, onSwitchToSignup, onDemoLogin }: LoginP
           </div>
 
           <form onSubmit={handleSubmit}>
-            <CardHeader className="pb-4 pt-0">
-              <h2 className="text-lg font-semibold text-foreground">Sign in with email</h2>
-              <p className="text-sm text-muted-foreground">Enter your credentials to continue</p>
-            </CardHeader>
-
-            <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="email" className="text-foreground">Email</Label>
+            <CardContent className="space-y-3 pt-0 px-5">
+              <div className="space-y-1.5">
+                <Label htmlFor="email" className="text-xs text-foreground">Email</Label>
                 <div className="relative">
-                  <Mail className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                  <Mail className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
                   <Input
                     id="email"
                     type="email"
                     placeholder="you@example.com"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    className="pl-10"
+                    className="pl-8 h-8 text-sm"
                     autoComplete="email"
                   />
                 </div>
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="password" className="text-foreground">Password</Label>
+              <div className="space-y-1.5">
+                <Label htmlFor="password" className="text-xs text-foreground">Password</Label>
                 <div className="relative">
-                  <Lock className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                  <Lock className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
                   <Input
                     id="password"
                     type="password"
                     placeholder="••••••••"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    className="pl-10"
+                    className="pl-8 h-8 text-sm"
                     autoComplete="current-password"
                   />
                 </div>
@@ -158,19 +152,19 @@ export default function Login({ onLogin, onSwitchToSignup, onDemoLogin }: LoginP
                   id="remember"
                   checked={rememberMe}
                   onCheckedChange={(checked) => setRememberMe(checked === true)}
+                  className="h-3.5 w-3.5"
                 />
-                <Label htmlFor="remember" className="cursor-pointer text-sm text-muted-foreground">
+                <Label htmlFor="remember" className="cursor-pointer text-xs text-muted-foreground">
                   Remember me
                 </Label>
               </div>
             </CardContent>
 
-            <CardFooter className="flex-col gap-4">
+            <CardFooter className="flex-col gap-2.5 px-5 pb-5">
               <Button
                 type="submit"
                 disabled={loading}
                 className="w-full bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
-                size="lg"
               >
                 {loading ? (
                   <>
@@ -188,13 +182,12 @@ export default function Login({ onLogin, onSwitchToSignup, onDemoLogin }: LoginP
                   variant="outline"
                   onClick={onDemoLogin}
                   className="w-full"
-                  size="lg"
                 >
-                  Try Demo — No Account Needed
+                  Try Demo
                 </Button>
               )}
 
-              <p className="text-center text-sm text-muted-foreground">
+              <p className="text-center text-xs text-muted-foreground">
                 Don&apos;t have an account?{' '}
                 <button
                   type="button"

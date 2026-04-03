@@ -3,5 +3,5 @@
   "status": "active",
   "stack": ["React", "TypeScript", "Tailwind CSS", "shadcn/ui", "Supabase"],
   "url": "https://hierarchical.app",
-  "notes": "Jira integration is live with full OAuth, API proxy, webhook events, and JiraView matching the Linear pattern. Overview now has a Standup button that generates a plain-language activity summary as a doc artifact. Recent Progress feed supports right-click dismiss and cleaned up timestamps. Next: re-enable Linear webhook HMAC verification, submit Figma app for review, and build Insights view."
+  "notes": "A comprehensive Design System page is live at /design-system, publicly accessible without auth, documenting all colors, typography, spacing, radii, elevation, buttons, inputs, badges, cards, icons, phases, statuses, and artifact types. Pushed 13 accumulated commits to GitHub covering months of feature work. Attempted Figma capture of screens via MCP but z-index conflicts with modals need resolution. Next: re-enable Linear webhook HMAC, submit Figma app for review, upgrade Supabase to Pro, build Insights view, make primary action buttons consistent."
 }

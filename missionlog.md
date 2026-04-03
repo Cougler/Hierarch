@@ -591,3 +591,25 @@ The Overview page has a full-height Recent Progress panel that shows an immutabl
 - Push all changes to GitHub
 
 ---
+
+## 2026-03-23 — Design System page + GitHub push
+
+A comprehensive Design System page is live at /design-system, publicly accessible without auth, documenting all colors, typography, spacing, radii, elevation, buttons, inputs, badges, cards, icons, phases, statuses, and artifact types. Pushed 13 accumulated commits to GitHub covering months of feature work. Attempted Figma capture of screens via MCP but z-index conflicts with modals need resolution. Next: re-enable Linear webhook HMAC, submit Figma app for review, upgrade Supabase to Pro, build Insights view, make primary action buttons consistent.
+
+**Done this session:**
+- Built `DesignSystemPage.tsx` with 13 sections: Brand, Colors (dark/light tabs with click-to-copy swatches), Typography, Spacing, Border Radii, Elevation, Buttons, Inputs & Controls, Badges, Cards, Icons, Phases & Statuses, Artifact Types
+- Wired `/design-system` route in App.tsx as a public page (no auth required)
+- Sticky side nav for section jumping
+- Pushed 13 local commits to origin/main
+- Created Figma file "Hierarch" and captured design system page + overview screen
+- Attempted onboarding capture but z-index conflict with modal prevented toolbar access
+
+**Up next:**
+- Re-enable Linear webhook HMAC signature verification
+- Submit Figma app for review
+- Upgrade Supabase to Pro for custom auth domain and Realtime
+- Build Insights view
+- Make primary action buttons consistent across the app
+- Complete Figma file with remaining screen captures
+
+---

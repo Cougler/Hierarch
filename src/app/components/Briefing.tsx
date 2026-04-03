@@ -607,46 +607,50 @@ export function Briefing({
 
               {!hasActivity ? (
                 <div className="rounded-xl border border-border/30 bg-card/20 overflow-hidden">
-                  <div className="p-2 opacity-30 pointer-events-none select-none">
-                    {/* Faded example: status change */}
-                    <div className="flex items-center gap-3 px-3 py-2.5 rounded-lg">
-                      <div className="w-2 h-2 rounded-full shrink-0 bg-blue-500" />
-                      <div className="flex-1 min-w-0">
-                        <p className="text-xs text-foreground truncate">Draft the navigation structure</p>
-                        <p className="text-[10px] text-muted-foreground mt-0.5">To Do <ArrowRight className="inline h-2.5 w-2.5" /> In Progress</p>
+                  <div className="relative">
+                    <div className="p-2 opacity-20 pointer-events-none select-none">
+                      {/* Faded example: status change */}
+                      <div className="flex items-center gap-3 px-3 py-2.5 rounded-lg">
+                        <div className="w-2 h-2 rounded-full shrink-0 bg-blue-500" />
+                        <div className="flex-1 min-w-0">
+                          <p className="text-xs text-foreground truncate">Draft the navigation structure</p>
+                          <p className="text-[10px] text-muted-foreground mt-0.5">To Do <ArrowRight className="inline h-2.5 w-2.5" /> In Progress</p>
+                        </div>
+                        <span className="text-xs text-muted-foreground/60 shrink-0">2h ago</span>
                       </div>
-                      <span className="text-xs text-muted-foreground/60 shrink-0">2h ago</span>
-                    </div>
-                    {/* Faded example: task created */}
-                    <div className="flex items-center gap-3 px-3 py-2.5 rounded-lg">
-                      <ListPlus className="h-3.5 w-3.5 text-blue-400 shrink-0" />
-                      <div className="flex-1 min-w-0">
-                        <p className="text-xs text-foreground truncate">Review competitor analysis</p>
-                        <p className="text-[10px] text-muted-foreground mt-0.5">Task created <span className="ml-1.5 text-muted-foreground/60">· Research</span></p>
+                      {/* Faded example: task created */}
+                      <div className="flex items-center gap-3 px-3 py-2.5 rounded-lg">
+                        <ListPlus className="h-3.5 w-3.5 text-blue-400 shrink-0" />
+                        <div className="flex-1 min-w-0">
+                          <p className="text-xs text-foreground truncate">Review competitor analysis</p>
+                          <p className="text-[10px] text-muted-foreground mt-0.5">Task created <span className="ml-1.5 text-muted-foreground/60">· Research</span></p>
+                        </div>
+                        <span className="text-xs text-muted-foreground/60 shrink-0">5h ago</span>
                       </div>
-                      <span className="text-xs text-muted-foreground/60 shrink-0">5h ago</span>
-                    </div>
-                    {/* Faded example: note created */}
-                    <div className="flex items-center gap-3 px-3 py-2.5 rounded-lg">
-                      <FileText className="h-3.5 w-3.5 text-violet-400 shrink-0" />
-                      <div className="flex-1 min-w-0">
-                        <p className="text-xs text-foreground truncate">User interview insights</p>
-                        <p className="text-[10px] text-muted-foreground mt-0.5">Note created <span className="ml-1.5 text-muted-foreground/60">· Discovery</span></p>
+                      {/* Faded example: note created */}
+                      <div className="flex items-center gap-3 px-3 py-2.5 rounded-lg">
+                        <FileText className="h-3.5 w-3.5 text-violet-400 shrink-0" />
+                        <div className="flex-1 min-w-0">
+                          <p className="text-xs text-foreground truncate">User interview insights</p>
+                          <p className="text-[10px] text-muted-foreground mt-0.5">Note created <span className="ml-1.5 text-muted-foreground/60">· Discovery</span></p>
+                        </div>
+                        <span className="text-xs text-muted-foreground/60 shrink-0">1d ago</span>
                       </div>
-                      <span className="text-xs text-muted-foreground/60 shrink-0">1d ago</span>
-                    </div>
-                    {/* Faded example: note edited */}
-                    <div className="flex items-center gap-3 px-3 py-2.5 rounded-lg">
-                      <PenLine className="h-3.5 w-3.5 text-attention shrink-0" />
-                      <div className="flex-1 min-w-0">
-                        <p className="text-xs text-foreground truncate">Design system decisions</p>
-                        <p className="text-[10px] text-muted-foreground mt-0.5">Note edited</p>
+                      {/* Faded example: note edited */}
+                      <div className="flex items-center gap-3 px-3 py-2.5 rounded-lg">
+                        <PenLine className="h-3.5 w-3.5 text-attention shrink-0" />
+                        <div className="flex-1 min-w-0">
+                          <p className="text-xs text-foreground truncate">Design system decisions</p>
+                          <p className="text-[10px] text-muted-foreground mt-0.5">Note edited</p>
+                        </div>
+                        <span className="text-xs text-muted-foreground/60 shrink-0">1d ago</span>
                       </div>
-                      <span className="text-xs text-muted-foreground/60 shrink-0">1d ago</span>
                     </div>
-                  </div>
-                  <div className="px-5 pb-5 pt-2 text-center">
-                    <p className="text-xs text-muted-foreground/60">Your activity from the last 48 hours will appear here.</p>
+                    <div className="absolute inset-0 flex items-center justify-center">
+                      <div className="rounded-lg bg-white/10 backdrop-blur-sm px-4 py-2">
+                        <p className="text-xs text-white font-medium">Your activity from the last 48 hours will appear here.</p>
+                      </div>
+                    </div>
                   </div>
                 </div>
               ) : (

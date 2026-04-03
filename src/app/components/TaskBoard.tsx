@@ -1015,7 +1015,7 @@ function ListView({
 
   return (
     <ScrollArea className="h-full">
-      <div className="min-w-[600px]">
+      <div className="min-w-[600px] max-w-full overflow-hidden">
         {/* Header — hidden when no tasks */}
         {tasks.length === 0 ? null : <div
           style={{ gridTemplateColumns: columnTemplate }}

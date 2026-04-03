@@ -1,12 +1,12 @@
 # Hierarch — Claude Handoff
 
-> Last updated: 2026-03-18
+> Last updated: 2026-03-23
 
 ## What This Is
-Hierarch is a React-based task and project management app built for designers. Projects move through design phases (Research, Explore, Design, Iterate, Review, Handoff) while tasks have simple statuses (To Do, In Progress, Review, Done). Includes an Overview dashboard with a real-time Recent Progress feed, board/list views, inline focus timer, capacity planning, artifacts (rich text notes + links + embeds), a blockers system, and working Linear and Figma integrations via OAuth with webhook-based real-time updates.
+Hierarch is a React-based task and project management app built for designers. Projects move through design phases (Research, Explore, Design, Iterate, Review, Handoff) while tasks have simple statuses (To Do, In Progress, Review, Done). Includes an Overview dashboard with a real-time Recent Progress feed, board/list views, inline focus timer, capacity planning, artifacts (rich text notes + links + embeds), a blockers system, and working Linear, Figma, and Jira integrations via OAuth with webhook-based real-time updates.
 
 ## Status
-The Overview page has a full-height Recent Progress panel that shows an immutable event ledger from Linear webhooks (via Supabase Realtime), local task/project activity, and Figma comments. Linear webhook pipeline is live: edge function receives events, stores them in `linear_events` table, and the client auto-updates via Supabase Realtime subscriptions. This session also unified all status/phase selectors, redesigned the Linear issue drawer to use the standard floating drawer shell, added assignee picker and team members API, renamed task Feedback status to Review, and polished the Briefing layout. Next: Jira integration (same webhook pattern), re-enable Linear webhook signature verification, and submit Figma app for review.
+A comprehensive Design System page is live at /design-system, publicly accessible without auth, documenting all colors, typography, spacing, radii, elevation, buttons, inputs, badges, cards, icons, phases, statuses, and artifact types. Pushed 13 accumulated commits to GitHub covering months of feature work. Attempted Figma capture of screens via MCP but z-index conflicts with modals need resolution. Next: re-enable Linear webhook HMAC, submit Figma app for review, upgrade Supabase to Pro, build Insights view, make primary action buttons consistent.
 
 ## Stack
 - **Framework**: React 18 + TypeScript + Vite
@@ -24,16 +24,18 @@ The Overview page has a full-height Recent Progress panel that shows an immutabl
 - **Dev server**: `npm run dev -- --port 3000` → http://localhost:3000
 - **Supabase dashboard**: https://supabase.com/dashboard/project/bccmvisblpuiceuowfez
 - **Edge function deploy**: `npx supabase functions deploy server --project-ref bccmvisblpuiceuowfez --no-verify-jwt`
+- **Design System**: http://localhost:3000/design-system (or hierarchical.app/design-system)
+- **Figma file**: https://www.figma.com/design/dXL0qSIa8HkE6IuhHoPjDC
 
 ## Architecture: Integrations System
 
-### OAuth Flow (Linear + Figma)
+### OAuth Flow (Linear + Figma + Jira)
 - `integrations` Supabase table stores tokens per user per provider (RLS: owner_id = auth.uid())
-- Edge function routes in `supabase/functions/server/index.ts`: `/linear/authorize`, `/linear/callback`, `/linear/refresh`, `/linear/disconnect` (same pattern for `/figma/*`)
+- Edge function routes in `supabase/functions/server/index.ts`: `/linear/authorize`, `/linear/callback`, `/linear/refresh`, `/linear/disconnect` (same pattern for `/figma/*` and `/jira/*`)
 - Client-side state validation via `sessionStorage` (not server KV, which is broken)
-- Frontend hooks: `src/app/hooks/use-linear-token.ts` and `use-figma-token.ts` — single source of truth for token, viewer info, OAuth start, disconnect
+- Frontend hooks: `src/app/hooks/use-linear-token.ts`, `use-figma-token.ts`, `use-jira-token.ts` — single source of truth for token, viewer info, OAuth start, disconnect
 - Custom events (`LINEAR_TOKEN_CHANGED`, `FIGMA_TOKEN_CHANGED`) broadcast state changes so all hook instances reload
-- `App.tsx` handles OAuth callbacks: detects `/auth/linear/callback` or `/auth/figma/callback` paths, exchanges code, navigates to integration page
+- `App.tsx` handles OAuth callbacks: detects `/auth/linear/callback`, `/auth/figma/callback`, `/auth/jira/callback` paths, exchanges code, navigates to integration page
 - `vercel.json` has SPA rewrite so callback routes resolve in production
 - 401 auto-retry: `linear.ts` has `setOnUnauthorized` callback wired from the hook for automatic token refresh
 
@@ -45,17 +47,7 @@ The Overview page has a full-height Recent Progress panel that shows an immutabl
 - Supabase Realtime enabled on `linear_events` table (REPLICA IDENTITY FULL)
 - Client subscribes to Realtime: App.tsx for Recent Progress feed, LinearView for issues table auto-refresh
 - `pg_cron` job runs daily at 3am UTC to delete events older than 15 days
-- Linear webhook configured in Linear API settings: Issues + Comments + Issue Labels checked
 - Webhook URL: `https://bccmvisblpuiceuowfez.supabase.co/functions/v1/server/linear/webhook`
-
-### Linear Integration (Client)
-- `src/app/components/LinearView.tsx` — issues table with priority bars, assignee picker (`PickerPopover`), status selector (2-col grid popover)
-- Issue drawer uses standard floating drawer shell (matches `UnifiedDrawer` pattern)
-- `linearApi.getTeamMembers()` fetches team members for assignee picker
-- `linearApi.updateIssue()` supports `assigneeId` for changing assignees
-- Figma URL field in drawer syncs to Linear as attachment
-- Description shows linkified URLs, video embeds (YouTube/Vimeo/Loom), Figma thumbnail previews
-- Team ID stored in localStorage (`hierarch-linear-team`)
 
 ### Figma Comments (Webhook-based)
 - `figma_webhooks` table stores registered webhooks (team_id, passcode, owner_id)
@@ -84,55 +76,38 @@ Tasks have 4 simple statuses stored in the `tasks.status` DB column:
 - `LEGACY_STATUS_MAP` maps old phase IDs to new task statuses on DB read
 - Statuses cached in localStorage (`hierarch-statuses`), auto-reset when titles change vs defaults
 
-## Architecture: Recent Progress Feed
-- `src/app/components/Briefing.tsx` — Overview page with full-height Recent Progress panel flush to right edge
-- Feed shows immutable event ledger (7-day window): task status changes, project phase changes, task/artifact/project creation, artifact edits, Linear webhook events, Figma comments
-- Linear events read from `linear_events` Supabase table (not API snapshots) — events persist even if issue state changes later
-- Contextual subtext: "Changed to [status]", "Issue created", "Assigned to [name]", "Comment by [actor]", "Comment from [handle]"
-- `App.tsx` calls `useLinearToken()` and `useFigmaToken()` at top level for feed data
-- Realtime subscription on `linear_events` auto-refreshes feed when webhooks arrive
+## Architecture: Design System Page
+- `src/app/components/DesignSystemPage.tsx` — standalone page at `/design-system`
+- Public (no auth required) — rendered before auth check in App.tsx
+- 13 sections with sticky side nav: Brand, Colors (dark/light tabs), Typography, Spacing, Border Radii, Elevation, Buttons, Inputs & Controls, Badges, Cards, Icons, Phases & Statuses, Artifact Types
+- Color swatches are click-to-copy (copies CSS variable name)
+- Uses actual shadcn/ui components (Button, Badge, Input, Card, Checkbox, Switch, Tabs)
 
 ## Architecture Notes
-- `src/app/App.tsx` — root component, manages all state. OAuth callback handlers. Drawer system uses `drawerStack: DrawerFrame[]`. Calls `useLinearToken()` and `useFigmaToken()` for Recent Progress feed.
+- `src/app/App.tsx` — root component, manages all state. OAuth callback handlers. Drawer system uses `drawerStack: DrawerFrame[]`. `/design-system` route rendered before auth check. `/signup` detected on load to set authView.
 - `src/app/components/UnifiedDrawer.tsx` — standard drawer shell: floating rounded panel, spring animations, breadcrumb nav
 - `src/app/components/TaskDetailsDrawer.tsx` — exports `PickerPopover` (searchable dropdown) for reuse across drawers
 - `src/app/components/LinearView.tsx` — subscribes to `linear_events` Realtime for auto-refresh
 - `src/app/components/IntegrationsPage.tsx` — Figma gated behind `comingSoon: window.location.hostname !== 'localhost'`
 - `src/app/components/NoteDrawer.tsx` — rich text editor with `contentEditable`, `formatBlock` wraps tags in angle brackets for browser compat. Font sizes: p=12px, h3=14px, h2=18px, h1=24px.
-- `src/app/components/ProjectDrawerContent.tsx` — `handlePhaseChange` records transitions in `metadata.phaseHistory` and auto-creates feedback artifact on review phase
-- `src/app/components/Sidebar.tsx` — nav items use `pl-1.5 pr-3` padding
 - All status/phase selectors use unified design: `rounded-lg bg-surface hover:bg-surface-hover` trigger, 2-column grid popover with `bg-accent/50` active state
-- `supabase/functions/server/index.ts` — all edge function routes (signup, avatar, time-entries, delete-account, Linear OAuth x4, Linear webhook, Figma OAuth x4, Figma webhook x3)
-
-## Blockers System
-- **Task blockers** (Supabase): `task_blockers` table with RLS
-- **Project blockers** (metadata JSONB): `BlockerItem` type with optional type/owner/createdAt/resolvedAt
-- **Dashboard**: blocked tasks appear in "Needs Attention" with highest priority
-
-## Theme System
-- CSS variables in `src/styles/theme.css` under `.light` and `.dark` classes
-- Custom tokens: `--shell`, `--drawer`, `--surface`, `--surface-hover`, `--attention`, `--shell-border`
-- `.invert-on-light` class for white SVG logos (Linear, arrow-down-right)
+- Theme tokens in `src/styles/theme.css`: `--shell`, `--drawer`, `--surface`, `--surface-hover`, `--attention`, `--shell-border`
 
 ## Recent Changes (this session)
-- Built Linear webhook pipeline: `linear_events` table, edge function endpoint, Supabase Realtime subscriptions, 15-day cleanup cron
-- Redesigned Linear issue drawer to standard floating drawer shell with assignee picker, Figma sync, video/Figma previews
-- Unified all status/phase/type selectors to consistent design
-- Renamed task "Feedback" status to "Review" (id unchanged for backwards compat)
-- Recent Progress panel: full-height, flush-right, immutable event ledger from Linear webhooks + local activity + Figma comments
-- Project phase change tracking in metadata.phaseHistory
-- Auto-create feedback artifact on project review phase
-- Rich text editor font size fixes and paragraph switching fix
-- Active projects: subtle bg treatment, anglearrow icon, spacing
-- Sidebar padding adjustment, Figma Coming Soon gate on production
+- Built `DesignSystemPage.tsx` with 13 sections documenting the full design system
+- Wired `/design-system` as a public route in App.tsx (rendered before auth check)
+- Pushed 13 accumulated commits to origin/main
+- Created Figma file "Hierarch" and captured design system + overview screens via Figma MCP
+- Attempted onboarding capture but z-index conflict between capture toolbar and onboarding modal (z-50) prevented access
 
 ## What's Next
-- **Jira integration**: Same webhook-based pattern as Linear (edge function routes, `jira_events` table, Realtime, JiraView component)
 - **Re-enable Linear webhook HMAC signature verification** (currently disabled — fix hex comparison or encoding)
 - **Submit Figma app for review** to enable production OAuth
-- **Replace Figma unread polling** with Supabase Realtime subscription on `figma_comments`
+- **Upgrade Supabase to Pro** for custom auth domain and Realtime
 - **Build Insights view**: phase analytics (avg feedback rounds, time per phase, completion funnel)
-- **Push to GitHub**: commit and push all changes
+- **Make primary action buttons consistent** across all views
+- **Complete Figma file** with remaining screen captures (resolve z-index issue for modal captures)
+- **Replace Figma unread polling** with Supabase Realtime subscription on `figma_comments`
 
 ## Known Issues / Gotchas
 - **Linear webhook signature verification is disabled** — edge function logs show 401 even with correct secret. Need to debug HMAC hex comparison. Endpoint is currently open (no auth).
@@ -146,3 +121,4 @@ Tasks have 4 simple statuses stored in the `tasks.status` DB column:
 - Figma OAuth callback URLs registered: same three origins
 - Deploy requires `--scope acportfolio`: `npx vercel deploy --prod --yes --scope acportfolio`
 - Figma webhook endpoint is public with passcode-only validation (no rate limiting or HMAC signing)
+- Figma MCP capture toolbar z-index conflicts with z-50 modals (onboarding dialog) — toolbar gets hidden behind overlay

@@ -38,6 +38,7 @@ import { FocusTimerView } from './components/FocusTimerView'
 import { LinearView } from './components/LinearView'
 import { JiraView } from './components/JiraView'
 import { IntegrationsPage } from './components/IntegrationsPage'
+import { DesignSystemPage } from './components/DesignSystemPage'
 import { NoteDrawer } from './components/NoteDrawer'
 import type { Artifact } from './components/NoteDrawer'
 import { UnifiedDrawer } from './components/UnifiedDrawer'
@@ -1143,6 +1144,10 @@ export default function App() {
       )
     }
 
+    if (activeView === 'design-system') {
+      return <DesignSystemPage />
+    }
+
     // Unknown view — redirect to overview
     setTimeout(() => setActiveView('today'), 0)
     return null
@@ -1167,7 +1172,19 @@ export default function App() {
     if (activeView === 'linear') return 'Linear'
     if (activeView === 'account') return 'Account'
     if (activeView === 'settings') return 'Settings'
+    if (activeView === 'design-system') return 'Design System'
     return ''
+  }
+
+  // Design system page (public, no auth required)
+  if (window.location.pathname === '/design-system') {
+    return (
+      <ThemeProvider defaultTheme="dark">
+        <div className="h-screen bg-background text-foreground">
+          <DesignSystemPage />
+        </div>
+      </ThemeProvider>
+    )
   }
 
   // Loading state
