@@ -131,9 +131,9 @@ export function DesignSystemPage() {
                 <p className="text-[11px] text-muted-foreground font-mono">#BF7535</p>
               </div>
               <div>
-                <div className="h-16 w-full rounded-lg mb-2" style={{ backgroundColor: '#cd8a3a' }} />
+                <div className="h-16 w-full rounded-lg mb-2" style={{ backgroundColor: '#bf7535' }} />
                 <p className="text-xs font-medium">Primary Amber (Dark)</p>
-                <p className="text-[11px] text-muted-foreground font-mono">#CD8A3A</p>
+                <p className="text-[11px] text-muted-foreground font-mono">#BF7535 (unified)</p>
               </div>
               <div>
                 <div className="h-16 w-full rounded-lg mb-2" style={{ backgroundColor: '#0F0E0D' }} />
@@ -175,10 +175,10 @@ export function DesignSystemPage() {
                 <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-4 mb-8">
                   <ColorSwatch name="Background" value="#0F0E0D" cssVar="var(--background)" />
                   <ColorSwatch name="Foreground" value="#EAE7E1" cssVar="var(--foreground)" />
-                  <ColorSwatch name="Primary" value="#cd8a3a" cssVar="var(--primary)" />
+                  <ColorSwatch name="Primary" value="#bf7535" cssVar="var(--primary)" />
                   <ColorSwatch name="Primary FG" value="#FFFFFF" cssVar="var(--primary-foreground)" />
                   <ColorSwatch name="Destructive" value="#E5484D" cssVar="var(--destructive)" />
-                  <ColorSwatch name="Ring" value="#cd8a3a" cssVar="var(--ring)" />
+                  <ColorSwatch name="Ring" value="#bf7535" cssVar="var(--ring)" />
                 </div>
 
                 <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-4">Surfaces</p>
